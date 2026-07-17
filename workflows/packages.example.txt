@@ -1,0 +1,6 @@
+# One Hackage package per line (name or name-version). Copy to packages.txt and edit.
+# Blank lines and #-comments are ignored. These must match diff keys in auto.diff;
+# list all keys with:  docker run --rm <agent-image> list
+heap-1.0.4
+algebra-4.3.1
+acid-state-0.16.1.4

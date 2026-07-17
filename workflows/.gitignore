@@ -1,0 +1,6 @@
+# Never commit real credentials — only secrets.example.yaml is tracked.
+secrets.yaml
+
+# Local package/repo lists (only the *.example.txt is tracked).
+packages.txt
+repos.txt

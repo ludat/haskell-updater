@@ -1,0 +1,22 @@
+# RBAC for the refactor workflow.
+#
+# The pipeline has NO Kubernetes-resource steps anymore (the build runs in a
+# sidecar, not a Sandbox CRD), so no step needs Kubernetes API access at all.
+# Both ServiceAccounts below are permission-less: they carry no RoleBindings.
+#
+#   - argo-refactor-runner : the workflow-level SA the clone/push/cleanup pods
+#                            run as. No RoleBindings; nothing it can do to the API.
+#   - refactor-agent       : the run-agent pod (agent + build sidecar). Combined
+#                            with automountServiceAccountToken:false it gets no
+#                            token mounted, so it cannot reach the API server.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argo-refactor-runner
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: refactor-agent
+automountServiceAccountToken: false

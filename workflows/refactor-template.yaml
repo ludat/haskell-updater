@@ -1,0 +1,332 @@
+# Haskell "Monad of No Return" refactor pipeline.
+#
+# The input is a HACKAGE PACKAGE (e.g. heap-1.0.4), not a git URL. resolve-repo
+# looks up the package's upstream git repository on Hackage; the pipeline then
+# forks that repo into the bot's own account and opens the PR from the fork.
+#
+#   resolve-repo ─► clone-repo ─► run-agent ─► push-and-pr
+#
+# onExit: delete-workspace (always runs, even on failure/crash).
+#
+# The build runs in a build-server SIDECAR next to run-agent (a stock Haskell
+# toolchain image with a static server binary injected by an initContainer), not
+# an external Sandbox CRD -- the agent talks to it over the pod's localhost.
+#
+# Submit one run with:
+#   argo submit -n refactor-bot --from workflowtemplate/haskell-refactor \
+#     -p package=heap-1.0.4
+#
+# Credential isolation (no step can reach the k8s API -- no resource steps exist):
+#   - resolve-repo                : no secrets (public Hackage only)
+#   - clone-repo / push-and-pr    : git-credentials secret only
+#   - run-agent (+ build sidecar) : NO secrets (applies patch, builds over localhost)
+#
+# run-agent is deterministic: it selects the precomputed diff for this package
+# from the patch set baked into its image, applies it, and asks the sidecar to
+# build. No LLM is involved.
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: haskell-refactor
+spec:
+  entrypoint: refactor
+  onExit: cleanup
+  serviceAccountName: argo-refactor-runner
+
+  arguments:
+    parameters:
+      - name: package
+        description: "Hackage package to refactor, e.g. heap-1.0.4 (version optional)."
+
+      - name: base-branch
+        value: ""
+        description: "Upstream branch to PR against; empty = auto-detect the repo's default branch."
+
+      - name: pr-branch
+        value: "amp-no-return-refactor"
+        description: "Branch the agent's changes are pushed to (on the fork)."
+
+      - name: agent-image
+        value: "ghcr.io/REPLACE_ME/refactor-agent:latest"
+        description: "Image built from agent/Dockerfile (patch set + apply/resolve script)."
+
+      - name: build-server-image
+        value: "ghcr.io/REPLACE_ME/refactor-build-server:latest"
+        description: "Carrier image (buildserver/Dockerfile) holding the static /execute binary."
+
+      - name: toolchain-image
+        value: "docker.io/haskell:9.10"
+        description: "Stock image the build sidecar runs (cabal/ghc); swappable, no rebuild needed."
+
+      - name: run-tests
+        value: "false"
+        description: "If true, run 'cabal test all' in the sidecar after building."
+
+
+  volumes:
+    - name: workspace
+      persistentVolumeClaim:
+        claimName: refactor-workspace
+
+  templates:
+    # ─────────────────────────── DAG ───────────────────────────
+    - name: refactor
+      dag:
+        tasks:
+          - name: resolve-repo
+            template: resolve-repo
+
+          - name: clone-repo
+            template: clone-repo
+            dependencies: [resolve-repo]
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{tasks.resolve-repo.outputs.parameters.repo}}"
+
+          - name: run-agent
+            template: run-agent
+            dependencies: [clone-repo]
+
+          - name: push-and-pr
+            template: push-and-pr
+            dependencies: [run-agent]
+            arguments:
+              parameters:
+                - name: repo
+                  value: "{{tasks.resolve-repo.outputs.parameters.repo}}"
+                - name: base-branch
+                  value: "{{tasks.clone-repo.outputs.parameters.base-branch}}"
+
+    # ─────────────────────── resolve-repo ───────────────────────
+    # Hackage package -> upstream git repo URL. Uses the agent image's `resolve`
+    # subcommand (fetches the package's .cabal from public Hackage, reads its
+    # source-repository). No secrets, no k8s API access.
+    - name: resolve-repo
+      serviceAccountName: refactor-agent
+      automountServiceAccountToken: false
+      container:
+        image: "{{workflow.parameters.agent-image}}"
+        command: ["python3", "/app/refactor.py"]
+        args: ["resolve", "{{workflow.parameters.package}}", "--out-dir", "/tmp/resolve"]
+      outputs:
+        parameters:
+          - name: repo
+            valueFrom:
+              path: /tmp/resolve/repo
+          - name: name
+            valueFrom:
+              path: /tmp/resolve/name
+
+    # ─────────────────────── clone-repo ───────────────────────
+    # Clones the upstream repo's default branch (many old Haskell repos use
+    # `master`, not `main`), records that branch name for the PR base, and
+    # creates the working branch.
+    - name: clone-repo
+      inputs:
+        parameters:
+          - name: repo
+      volumes:
+        - name: git-creds
+          secret:
+            secretName: git-credentials
+      script:
+        image: alpine/git:latest
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+            subPath: "{{workflow.name}}"
+          - name: git-creds
+            mountPath: /secrets/git
+            readOnly: true
+        command: [sh]
+        source: |
+          set -eu
+          TOKEN="$(cat /secrets/git/token)"
+          USERNAME="$(cat /secrets/git/username)"
+          REPO='{{inputs.parameters.repo}}'
+          # Rewrite https://host/path -> https://user:token@host/path without logging it.
+          AUTH_URL="$(printf '%s' "$REPO" \
+            | sed "s#https://#https://${USERNAME}:${TOKEN}@#")"
+          rm -rf /workspace/repo
+
+          BASE='{{workflow.parameters.base-branch}}'
+          if [ -n "$BASE" ]; then
+            git clone --branch "$BASE" --depth 1 "$AUTH_URL" /workspace/repo
+          else
+            # No branch given: clone the repo's default branch and detect its name.
+            git clone --depth 1 "$AUTH_URL" /workspace/repo
+            BASE="$(git -C /workspace/repo rev-parse --abbrev-ref HEAD)"
+          fi
+          printf '%s' "$BASE" > /tmp/base-branch
+
+          # Drop the token-bearing remote; push step sets its own authenticated remote.
+          git -C /workspace/repo remote set-url origin "$REPO"
+          git -C /workspace/repo checkout -b '{{workflow.parameters.pr-branch}}'
+          echo "Cloned $REPO @ $(git -C /workspace/repo rev-parse --short HEAD) (base: $BASE)"
+      outputs:
+        parameters:
+          - name: base-branch
+            valueFrom:
+              path: /tmp/base-branch
+
+    # ───────────────────────── run-agent ─────────────────────────
+    # Selects this package's precomputed diff from the patch set baked into the
+    # image, discovers the package dir inside the checkout (handles monorepo
+    # subdirs), applies the diff, then runs `cabal build` in the build sidecar
+    # over localhost. No Kubernetes API access, no secrets.
+    #
+    # The build sidecar is a STOCK toolchain image (haskell:9.10) with the static
+    # /execute server injected: an initContainer copies the binary out of the
+    # carrier image onto a shared emptyDir, and the sidecar runs it. Swapping the
+    # toolchain version is just a parameter change -- no image rebuild.
+    - name: run-agent
+      serviceAccountName: refactor-agent
+      automountServiceAccountToken: false
+      volumes:
+        - name: tools
+          emptyDir: {}
+      initContainers:
+        # Copy the static build-server binary onto the shared `tools` volume so
+        # the stock toolchain sidecar can exec it.
+        - name: install-build-server
+          image: "{{workflow.parameters.build-server-image}}"
+          command: [sh, -c, "cp /build-server /opt/tools/build-server"]
+          mirrorVolumeMounts: true
+      sidecars:
+        - name: build-server
+          image: "{{workflow.parameters.toolchain-image}}"
+          command: ["/opt/tools/build-server"]
+          env:
+            - name: PORT
+              value: "8080"
+            - name: WORKDIR
+              value: /workspace/repo
+          volumeMounts:
+            - name: tools
+              mountPath: /opt/tools
+              readOnly: true
+            - name: workspace
+              mountPath: /workspace
+              subPath: "{{workflow.name}}"
+      container:
+        image: "{{workflow.parameters.agent-image}}"
+        args: ["run"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+            subPath: "{{workflow.name}}"
+          - name: tools
+            mountPath: /opt/tools
+        env:
+          # Checkout root; refactor.py finds the package dir under it by .cabal
+          # name and uses that path (which the sidecar mounts identically) as the
+          # build cwd, so BUILD_CWD is intentionally left unset.
+          - name: WORKDIR
+            value: /workspace/repo
+          - name: PACKAGE
+            value: "{{workflow.parameters.package}}"
+          - name: BUILDER_URL
+            value: "http://localhost:8080"
+          - name: RESULT_PATH
+            value: /workspace/result.json
+          - name: RUN_TESTS
+            value: "{{workflow.parameters.run-tests}}"
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              # refactor.py writes {package, matched_key, package_dir, applied,
+              # build, status, diff_stat} here.
+              default: "{}"
+              path: /workspace/result.json
+
+    # ──────────────────────── push-and-pr ────────────────────────
+    # Forks the upstream repo into the bot's own account, pushes the branch to
+    # that fork, and opens a cross-fork PR against upstream. The git token is
+    # mounted only here; forking is folded into this step so no other step needs
+    # the token.
+    - name: push-and-pr
+      inputs:
+        parameters:
+          - name: repo
+          - name: base-branch
+      volumes:
+        - name: git-creds
+          secret:
+            secretName: git-credentials
+      script:
+        image: alpine/git:latest
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+            subPath: "{{workflow.name}}"
+          - name: git-creds
+            mountPath: /secrets/git
+            readOnly: true
+        command: [sh]
+        source: |
+          set -eu
+          apk add --no-cache github-cli >/dev/null 2>&1 || apk add --no-cache gh >/dev/null 2>&1
+          TOKEN="$(cat /secrets/git/token)"
+          USERNAME="$(cat /secrets/git/username)"
+          export GH_TOKEN="$TOKEN"
+          UPSTREAM='{{inputs.parameters.repo}}'         # https://github.com/owner/name
+          BASE='{{inputs.parameters.base-branch}}'
+          BRANCH='{{workflow.parameters.pr-branch}}'
+          cd /workspace/repo
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes produced by agent; nothing to push."
+            exit 0
+          fi
+
+          git config user.name "$USERNAME"
+          git config user.email "${USERNAME}@users.noreply.github.com"
+          git add -A
+          git commit -m "Monad of No Return: prefer pure over redundant return (AMP)"
+
+          # owner/name for gh commands.
+          SLUG="$(printf '%s' "$UPSTREAM" | sed -E 's#https?://[^/]+/##; s#\.git$##')"
+          # Fork into the bot's account (idempotent; no-op if it already exists).
+          gh repo fork "$SLUG" --clone=false
+          FORK_OWNER="$(gh api user --jq .login)"
+          FORK_NAME="${SLUG#*/}"
+
+          # Push the branch to the fork (retry: the fork may take a moment to appear).
+          FORK_URL="https://${USERNAME}:${TOKEN}@github.com/${FORK_OWNER}/${FORK_NAME}.git"
+          n=0
+          until git push "$FORK_URL" "$BRANCH"; do
+            n=$((n+1)); [ "$n" -ge 5 ] && { echo "push to fork failed"; exit 1; }
+            echo "fork not ready yet, retrying ($n)..."; sleep 5
+          done
+
+          gh pr create \
+            --repo "$SLUG" \
+            --base "$BASE" \
+            --head "${FORK_OWNER}:${BRANCH}" \
+            --title "Monad of No Return: prefer pure over redundant return" \
+            --body "Automated AMP-style refactor (return -> pure). Verified with cabal build in an isolated build container." \
+            || echo "gh pr create failed (branch pushed to fork; open PR manually)."
+
+    # ───────────────────────── cleanup ──────────────────────────
+    # onExit handler: runs on success AND failure/crash of the main DAG. The
+    # build sidecar is torn down automatically with the run-agent pod, so only
+    # the shared workspace subpath needs clearing.
+    - name: cleanup
+      steps:
+        - - name: delete-workspace
+            template: delete-workspace
+
+    - name: delete-workspace
+      script:
+        image: alpine:latest
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+            subPath: "{{workflow.name}}"
+        command: [sh]
+        source: |
+          set -eu
+          rm -rf /workspace/repo /workspace/result.json
+          echo "Cleared workspace subpath for {{workflow.name}}"

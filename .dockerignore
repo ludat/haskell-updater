@@ -1,0 +1,12 @@
+# Keep the build context tiny: the run-agent image needs only agent/refactor.py
+# and auto.diff (both COPYed explicitly in agent/Dockerfile).
+.git
+.github
+.claude
+ai
+workflows
+buildserver
+flake.nix
+flake.lock
+result
+*.md

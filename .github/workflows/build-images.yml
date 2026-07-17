@@ -1,0 +1,74 @@
+# Build the two pipeline images and publish them to GHCR:
+#   - refactor-agent        (agent/Dockerfile, context = repo root for auto.diff)
+#   - refactor-build-server (buildserver/Dockerfile, static /execute binary)
+#
+# Auth: the built-in GITHUB_TOKEN (no PAT needed) with packages:write.
+# Point the Argo workflow at published tags via
+#   -p agent-image=ghcr.io/<owner>/refactor-agent:latest
+#   -p build-server-image=ghcr.io/<owner>/refactor-build-server:latest
+name: build-images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "agent/**"
+      - "buildserver/**"
+      - "auto.diff"
+      - ".github/workflows/build-images.yml"
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: refactor-agent
+            context: .
+            file: agent/Dockerfile
+          - image: refactor-build-server
+            context: buildserver
+            file: buildserver/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

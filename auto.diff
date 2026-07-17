@@ -1,0 +1,3668 @@
+
+
+# diff for acid-state-0.16.1.4
+diff --git a/src/Data/Acid/Common.hs b/src/Data/Acid/Common.hs
+index 3bfd2f7..fdb4638 100644
+--- a/src/Data/Acid/Common.hs
++++ b/src/Data/Acid/Common.hs
+@@ -25,21 +25,11 @@ class IsAcidic st where
+ 
+ -- | Context monad for Update events.
+ newtype Update st a = Update { unUpdate :: State st a }
+-    deriving (Monad, Functor, MonadState st)
+-
+--- mtl pre-2.0 doesn't have these instances to newtype-derive, but they're
+--- simple enough.
+-instance Applicative (Update st) where
+-    pure = return
+-    (<*>) = ap
++    deriving (Monad, Applicative, Functor, MonadState st)
+ 
+ -- | Context monad for Query events.
+ newtype Query st a  = Query { unQuery :: Reader st a }
+-    deriving (Monad, Functor, MonadReader st)
+-
+-instance Applicative (Query st) where
+-    pure = return
+-    (<*>) = ap
++    deriving (Monad, Applicative, Functor, MonadReader st)
+ 
+ -- | Run a query in the Update Monad.
+ liftQuery :: Query st a -> Update st a
+
+
+# diff for alex-meta-0.3.0.13
+diff --git a/src/NFA.hs b/src/NFA.hs
+index 8c2b322..dd79ca4 100644
+--- a/src/NFA.hs
++++ b/src/NFA.hs
+@@ -164,8 +164,6 @@ type MapNFA = Map SNum NState
+ newtype NFAM a = N {unN :: SNum -> MapNFA -> Encoding -> (SNum, MapNFA, a)}
+ 
+ instance Monad NFAM where
+-  return a = N $ \s n e -> (s,n,a)
+-
+   m >>= k  = N $ \s n e -> case unN m s n e of
+                                  (s', n', a) -> unN (k a) s' n' e
+ 
+@@ -174,7 +172,7 @@ instance Functor NFAM where
+ 
+ instance Applicative NFAM where
+   (<*>) = ap
+-  pure = return
++  pure a = N $ \s n e -> (s,n,a)
+ 
+ runNFA :: Encoding -> NFAM () -> NFA
+ runNFA e m = case unN m 0 Map.empty e of
+diff --git a/src/ParseMonad.hs b/src/ParseMonad.hs
+index bc16e81..2c4ca00 100644
+--- a/src/ParseMonad.hs
++++ b/src/ParseMonad.hs
+@@ -89,7 +89,6 @@ instance Monad P where
+  (P m) >>= k = P $ \env -> case m env of
+                         Left err -> Left err
+                         Right (env',ok) -> unP (k ok) env'
+- return a = P $ \env -> Right (env,a)
+ 
+ runP :: String -> (Map String CharSet, Map String RExp) 
+         -> P a -> Either ParseError a
+@@ -106,7 +105,7 @@ instance Functor P where
+ 
+ instance Applicative P where
+   (<*>) = ap
+-  pure = return
++  pure a = P $ \env -> Right (env,a)
+ 
+ failP :: String -> P a
+ failP str = P $ \PState{ input = (p,_,_,_) } -> Left (Just p,str)
+
+
+# diff for algebra-4.3.1
+diff --git a/src/Numeric/Algebra/Complex.hs b/src/Numeric/Algebra/Complex.hs
+index f874c4e..91d3c1b 100644
+--- a/src/Numeric/Algebra/Complex.hs
++++ b/src/Numeric/Algebra/Complex.hs
+@@ -85,7 +85,6 @@ instance Bind Complex where
+   (>>-) = bindRep
+ 
+ instance Monad Complex where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader ComplexBasis Complex where
+diff --git a/src/Numeric/Algebra/Dual.hs b/src/Numeric/Algebra/Dual.hs
+index 0aef965..47ea497 100644
+--- a/src/Numeric/Algebra/Dual.hs
++++ b/src/Numeric/Algebra/Dual.hs
+@@ -71,7 +71,6 @@ instance Bind Dual where
+   (>>-) = bindRep
+ 
+ instance Monad Dual where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader DualBasis Dual where
+diff --git a/src/Numeric/Algebra/Hyperbolic.hs b/src/Numeric/Algebra/Hyperbolic.hs
+index df94382..75f4bbc 100644
+--- a/src/Numeric/Algebra/Hyperbolic.hs
++++ b/src/Numeric/Algebra/Hyperbolic.hs
+@@ -62,7 +62,6 @@ instance Bind Hyper' where
+   (>>-) = bindRep
+ 
+ instance Monad Hyper' where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader HyperBasis' Hyper' where
+diff --git a/src/Numeric/Algebra/Quaternion.hs b/src/Numeric/Algebra/Quaternion.hs
+index 1a96171..d106016 100644
+--- a/src/Numeric/Algebra/Quaternion.hs
++++ b/src/Numeric/Algebra/Quaternion.hs
+@@ -98,7 +98,6 @@ instance Bind Quaternion where
+   (>>-) = bindRep
+ 
+ instance Monad Quaternion where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader QuaternionBasis Quaternion where
+diff --git a/src/Numeric/Coalgebra/Dual.hs b/src/Numeric/Coalgebra/Dual.hs
+index eca9754..a5f3f85 100644
+--- a/src/Numeric/Coalgebra/Dual.hs
++++ b/src/Numeric/Coalgebra/Dual.hs
+@@ -70,7 +70,6 @@ instance Bind Dual' where
+   (>>-) = bindRep
+ 
+ instance Monad Dual' where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader DualBasis' Dual' where
+diff --git a/src/Numeric/Coalgebra/Hyperbolic.hs b/src/Numeric/Coalgebra/Hyperbolic.hs
+index 25cadfa..6956533 100644
+--- a/src/Numeric/Coalgebra/Hyperbolic.hs
++++ b/src/Numeric/Coalgebra/Hyperbolic.hs
+@@ -63,7 +63,6 @@ instance Bind Hyper where
+   (>>-) = bindRep
+ 
+ instance Monad Hyper where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader HyperBasis Hyper where
+diff --git a/src/Numeric/Coalgebra/Quaternion.hs b/src/Numeric/Coalgebra/Quaternion.hs
+index 276457a..20f8e97 100644
+--- a/src/Numeric/Coalgebra/Quaternion.hs
++++ b/src/Numeric/Coalgebra/Quaternion.hs
+@@ -98,7 +98,6 @@ instance Bind Quaternion' where
+   (>>-) = bindRep
+ 
+ instance Monad Quaternion' where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader QuaternionBasis' Quaternion' where
+diff --git a/src/Numeric/Coalgebra/Trigonometric.hs b/src/Numeric/Coalgebra/Trigonometric.hs
+index 003bfdd..33315f6 100644
+--- a/src/Numeric/Coalgebra/Trigonometric.hs
++++ b/src/Numeric/Coalgebra/Trigonometric.hs
+@@ -88,7 +88,6 @@ instance Bind Trig where
+   (>>-) = bindRep
+ 
+ instance Monad Trig where
+-  return = pureRep
+   (>>=) = bindRep
+ 
+ instance MonadReader TrigBasis Trig where
+diff --git a/src/Numeric/Covector.hs b/src/Numeric/Covector.hs
+index 679e348..fcfb787 100644
+--- a/src/Numeric/Covector.hs
++++ b/src/Numeric/Covector.hs
+@@ -51,7 +51,6 @@ instance Bind (Covector r) where
+   m >>- f = Covector $ \k -> m $* \a -> f a $* k
+   
+ instance Monad (Covector r) where
+-  return a = Covector $ \k -> k a
+   m >>= f = Covector $ \k -> m $* \a -> f a $* k
+ 
+ instance Additive r => Alt (Covector r) where
+diff --git a/src/Numeric/Map.hs b/src/Numeric/Map.hs
+index d61325b..8f5d825 100644
+--- a/src/Numeric/Map.hs
++++ b/src/Numeric/Map.hs
+@@ -71,7 +71,6 @@ instance Bind (Map r b) where
+   Map m >>- f = Map $ \k b -> m (\a -> (f a $# k) b) b
+ 
+ instance Monad (Map r b) where
+-  return a = Map $ \k _ -> k a
+   m >>= f = Map $ \k b -> (m $# \a -> (f a $# k) b) b
+ 
+ instance Arrow (Map r) where
+diff --git a/src/Numeric/Ring/Endomorphism.hs b/src/Numeric/Ring/Endomorphism.hs
+index 5b02479..4836a98 100644
+--- a/src/Numeric/Ring/Endomorphism.hs
++++ b/src/Numeric/Ring/Endomorphism.hs
+@@ -19,7 +19,6 @@ newtype End a = End { appEnd :: a -> a }
+ instance Semigroup (End r) where
+   (End a) <> (End b) = End (a . b)
+ instance Monoid (End r) where
+-  mappend (End a) (End b) = End (a . b)
+   mempty = End id
+ instance Additive r => Additive (End r) where
+   End f + End g = End (f + g)
+
+
+# diff for audacity-0.0.2.2
+diff --git a/src/Sound/Audacity/LabelTrack.hs b/src/Sound/Audacity/LabelTrack.hs
+index e2a8312..dc23eb4 100644
+--- a/src/Sound/Audacity/LabelTrack.hs
++++ b/src/Sound/Audacity/LabelTrack.hs
+@@ -44,7 +44,6 @@ instance Sg.Semigroup (T time label) where
+ 
+ instance Mn.Monoid (T time label) where
+    mempty = empty
+-   mappend (Cons xs) (Cons ys) = Cons $ xs ++ ys
+    mconcat = Cons . concatMap decons
+ 
+ instance (NFData time, NFData label) => NFData (T time label) where
+
+
+# diff for backtracking-0.1.0
+diff --git a/src/Control/Monad/Search.hs b/src/Control/Monad/Search.hs
+index 67a4674..8a9adfd 100644
+--- a/src/Control/Monad/Search.hs
++++ b/src/Control/Monad/Search.hs
+@@ -51,11 +51,10 @@ instance Functor BFS where
+   fmap f (BFS xss) = BFS $ map (\xs -> map f xs) xss
+ 
+ instance Applicative BFS where
+-  pure = return
++  pure x = BFS [[x]]
+   (<*>) = ap
+ 
+ instance Monad BFS where
+-  return x = BFS [[x]]
+   BFS [] >>= _ = BFS []
+   BFS (xs:xss) >>= f = foldl mplus mzero (map f xs) `mplus` shift (BFS xss >>= f)
+    where
+
+
+# diff for battleship-combinatorics-0.0.1
+diff --git a/src/Combinatorics/Battleship/Count/CountMap.hs b/src/Combinatorics/Battleship/Count/CountMap.hs
+index d43bdae..b012f70 100644
+--- a/src/Combinatorics/Battleship/Count/CountMap.hs
++++ b/src/Combinatorics/Battleship/Count/CountMap.hs
+@@ -270,5 +270,4 @@ instance (Counter.C a, Storable a) => Semigroup (T w a) where
+ 
+ instance (Counter.C a, Storable a) => Monoid (T w a) where
+    mempty = empty
+-   mappend = merge
+    mconcat = mergeMany
+
+
+# diff for bencode-0.6.1.1
+diff --git a/src/Data/BEncode/Parser.hs b/src/Data/BEncode/Parser.hs
+index a316e00..aefe0ab 100644
+--- a/src/Data/BEncode/Parser.hs
++++ b/src/Data/BEncode/Parser.hs
+@@ -58,14 +58,13 @@ data Reply a
+     | Error String
+ 
+ instance Applicative BParser where
+-    pure = return
++    pure val = BParser $ Ok val
+     (<*>) = ap
+ 
+ instance Monad BParser where
+     (BParser p) >>= f = BParser $ \b -> case p b of
+                                           Ok a b' -> runB (f a) b'
+                                           Error str -> Error str
+-    return val = BParser $ Ok val
+ #if MIN_VERSION_base(4,13,0)
+ instance Fail.MonadFail BParser where
+ #endif
+
+
+# diff for binary-search-2.0.0
+diff --git a/Numeric/Search.hs b/Numeric/Search.hs
+index 336d271..2e728dc 100644
+--- a/Numeric/Search.hs
++++ b/Numeric/Search.hs
+@@ -128,7 +128,6 @@ instance Applicative (Evidence e) where
+     Evidence f <*> r         = fmap f r
+ 
+ instance Monad (Evidence e) where
+-    return                   = Evidence
+     CounterEvidence  l >>= _ = CounterEvidence l
+     Evidence r >>= k         = k r
+ 
+
+
+# diff for BNFC-meta-0.6.1
+diff --git a/Language/LBNF/Runtime.hs b/Language/LBNF/Runtime.hs
+index d0d5f96..76433b7 100644
+--- a/Language/LBNF/Runtime.hs
++++ b/Language/LBNF/Runtime.hs
+@@ -42,7 +42,6 @@ data ParseMonad a = Ok a | Bad String
+   deriving (Read, Show, Eq, Ord)
+ 
+ instance Monad ParseMonad where
+-  return      = Ok
+   Ok a  >>= f = f a
+   Bad s >>= f = Bad s
+ 
+@@ -54,7 +53,7 @@ instance Functor ParseMonad where
+ 
+ instance Applicative ParseMonad where
+   (<*>) = ap
+-  pure = return
++  pure      = Ok
+ 
+ --instance MonadPlus ParseMonad where
+ --  mzero = Bad "Err.mzero"
+
+
+# diff for board-games-0.4.0.1
+diff --git a/src/Game/Labyrinth.hs b/src/Game/Labyrinth.hs
+index d4003d5..17dedba 100644
+--- a/src/Game/Labyrinth.hs
++++ b/src/Game/Labyrinth.hs
+@@ -257,7 +257,6 @@ instance Semigroup a => Semigroup (Directions a) where
+ 
+ instance Monoid a => Monoid (Directions a) where
+    mempty = pure mempty
+-   mappend = App.lift2 mappend
+ 
+ instance Functor Directions where
+    fmap f (Directions n w s e) = Directions (f n) (f w) (f s) (f e)
+
+
+# diff for boundingboxes-0.2.3
+diff --git a/Data/BoundingBox.hs b/Data/BoundingBox.hs
+index b7b4f87..0541519 100644
+--- a/Data/BoundingBox.hs
++++ b/Data/BoundingBox.hs
+@@ -30,8 +30,6 @@ instance Applicative f => Applicative (Box f) where
+     {-# INLINE (<*>) #-}
+ 
+ instance Monad f => Monad (Box f) where
+-    return a = Box (return a) (return a)
+-    {-# INLINE return #-}
+     Box f g >>= k = Box (f >>= \x -> let Box p _ = k x in p) (g >>= \x -> let Box _ q = k x in q)
+ 
+ -- | check whether the point is in the box.
+
+
+# diff for c2hs-0.28.8
+diff --git a/src/Control/StateBase.hs b/src/Control/StateBase.hs
+index 6409765..9ce3997 100644
+--- a/src/Control/StateBase.hs
++++ b/src/Control/StateBase.hs
+@@ -91,11 +91,10 @@ instance Functor (PreCST e s) where
+   fmap = liftM
+ 
+ instance Applicative (PreCST e s) where
+-  pure  = return
++  pure = yield
+   (<*>) = ap
+ 
+ instance Monad (PreCST e s) where
+-  return = yield
+   (>>=)  = (+>=)
+ 
+ 
+diff --git a/src/Control/StateTrans.hs b/src/Control/StateTrans.hs
+index fc05470..4260822 100644
+--- a/src/Control/StateTrans.hs
++++ b/src/Control/StateTrans.hs
+@@ -106,11 +106,10 @@ instance Functor (STB bs gs) where
+   fmap = liftM
+ 
+ instance Applicative (STB bs gs) where
+-  pure  = return
++  pure  = yield
+   (<*>) = ap
+ 
+ instance Monad (STB bs gs) where
+-  return = yield
+   (>>=)  = (+>=)
+ 
+ -- | the monad's unit
+
+
+# diff for cgi-3001.5.1.0
+diff --git a/src/Network/CGI/Monad.hs b/src/Network/CGI/Monad.hs
+index 117b1b9..9cae792 100644
+--- a/src/Network/CGI/Monad.hs
++++ b/src/Network/CGI/Monad.hs
+@@ -59,7 +59,6 @@ instance (Applicative m) => Applicative (CGIT m) where
+ 
+ instance Monad m => Monad (CGIT m) where
+     c >>= f = CGIT (unCGIT c >>= unCGIT . f)
+-    return = CGIT . return
+ 
+ instance MonadFail m => MonadFail (CGIT m) where
+     fail = CGIT . fail
+
+
+# diff for comfort-graph-0.0.4.1
+diff --git a/src/Data/Graph/Comfort.hs b/src/Data/Graph/Comfort.hs
+index 0b6eb72..5028293 100644
+--- a/src/Data/Graph/Comfort.hs
++++ b/src/Data/Graph/Comfort.hs
+@@ -494,7 +494,6 @@ instance
+    (Edge edge, Ord node) =>
+       Monoid (Graph edge node edgeLabel nodeLabel) where
+    mempty = empty
+-   mappend = union
+ 
+ 
+ {- |
+
+
+# diff for compensated-0.8.3
+diff --git a/src/Numeric/Compensated.hs b/src/Numeric/Compensated.hs
+index 735075f..78f903d 100644
+--- a/src/Numeric/Compensated.hs
++++ b/src/Numeric/Compensated.hs
+@@ -361,8 +361,6 @@ instance Compensable a => Semigroup (Compensated a) where
+ instance Compensable a => Monoid (Compensated a) where
+   mempty = compensated 0 0
+   {-# INLINE mempty #-}
+-  mappend = (+)
+-  {-# INLINE mappend #-}
+ 
+ -- | Perform Kahan summation over a list.
+ kahan :: (Foldable f, Compensable a) => f a -> Compensated a
+
+
+# diff for constrained-categories-0.4.2.0
+diff --git a/Data/CategoryObject/Product.hs b/Data/CategoryObject/Product.hs
+index f7ca0ee..4d379a0 100644
+--- a/Data/CategoryObject/Product.hs
++++ b/Data/CategoryObject/Product.hs
+@@ -45,5 +45,3 @@ instance (Semigroup a, Semigroup b) => Semigroup (ProductCatObj a b) where
+ 
+ instance (Monoid a, Monoid b) => Monoid (ProductCatObj a b) where
+   mempty = ProductCatObj mempty mempty
+-  mappend (ProductCatObj x y) (ProductCatObj w z)
+-       = ProductCatObj (mappend x w) (mappend y z)
+
+
+# diff for control-monad-free-0.6.2
+diff --git a/Control/Monad/Free.hs b/Control/Monad/Free.hs
+index 9ec9179..62d229c 100644
+--- a/Control/Monad/Free.hs
++++ b/Control/Monad/Free.hs
+@@ -81,7 +81,6 @@ instance Traversable f => Traversable (Free f) where
+     traverse f (Impure a) = Impure <$> traverse (traverse f) a
+ 
+ instance Functor f => Monad (Free f) where
+-    return          = Pure
+     Pure a    >>= f = f a
+     Impure fa >>= f = Impure (fmap (>>= f) fa)
+ 
+@@ -146,7 +145,6 @@ instance (Functor f, Functor a, Monad a) => Applicative (FreeT f a) where
+     (<*>) = ap
+ 
+ instance (Functor f, Monad m) => Monad (FreeT f m) where
+-    return = FreeT . return . Left
+     m >>= f = FreeT $ unFreeT m >>= \r ->
+         case r of
+              Left  x  -> unFreeT $ f x
+diff --git a/Control/Monad/Free/Improve.hs b/Control/Monad/Free/Improve.hs
+index 1c5f531..9574abd 100644
+--- a/Control/Monad/Free/Improve.hs
++++ b/Control/Monad/Free/Improve.hs
+@@ -34,11 +34,10 @@ instance Functor (C mu) where
+ --  fmap f (C m) = C (m . (.f))
+ 
+ instance Monad (C mu) where
+-  return a = C (\h -> h a)
+   C p >>= k = C (\h -> p (\a -> case k a of C q -> q h))
+ 
+ instance Applicative (C mu) where
+-  pure = return
++  pure a = C (\h -> h a)
+   (<*>) = ap
+ 
+ instance Functor f => MonadFree f (C (Free f)) where
+
+
+# diff for copilot-theorem-4.7.1
+diff --git a/src/Copilot/Theorem/Prove.hs b/src/Copilot/Theorem/Prove.hs
+index ed9a7d7..0749dd1 100644
+--- a/src/Copilot/Theorem/Prove.hs
++++ b/src/Copilot/Theorem/Prove.hs
+@@ -79,12 +79,11 @@ instance Functor (ProofScheme a) where
+   fmap = liftM
+ 
+ instance Applicative (ProofScheme a) where
+-  pure = return
++  pure a = Proof (return a)
+   (<*>) = ap
+ 
+ instance Monad (ProofScheme a) where
+   (Proof p) >>= f = Proof $ p >>= (\a -> case f a of Proof p' -> p')
+-  return a = Proof (return a)
+ 
+ -- | Prover actions.
+ data Action where
+
+
+# diff for csp-1.4.0
+diff --git a/src/Control/Monad/CSP.hs b/src/Control/Monad/CSP.hs
+index d42d715..3f0f1a5 100644
+--- a/src/Control/Monad/CSP.hs
++++ b/src/Control/Monad/CSP.hs
+@@ -104,12 +104,11 @@ instance Functor (CSP r) where
+     fmap = liftM
+  
+ instance Applicative (CSP r) where
+-    pure  = return
++    pure a = CSP (\_ -> return a)
+     (<*>) = ap
+ 
+ instance Monad (CSP r) where
+     CSP x >>= y = CSP (\s -> x s >>= (\(CSP z) -> z s) . y)
+-    return a = CSP (\_ -> return a)
+ 
+ -- | Extract the current domain of a variable.
+ domain :: DV t t1 -> IO [t1]
+
+
+# diff for data-diverse-4.7.1.0
+diff --git a/src/Data/Diverse/Many/Internal.hs b/src/Data/Diverse/Many/Internal.hs
+index 185d855..74aff0b 100644
+--- a/src/Data/Diverse/Many/Internal.hs
++++ b/src/Data/Diverse/Many/Internal.hs
+@@ -1091,22 +1091,15 @@ instance Semigroup (Many_ xs) => Semigroup (Many xs) where
+ 
+ instance Monoid (Many_ '[]) where
+     mempty = Many_ []
+-    mappend = (<>)
+ 
+ instance (Monoid x, Monoid (Many_ xs)) => Monoid (Many_ (x ': xs)) where
+     mempty = Many_ (c : cs)
+       where
+         c = unsafeCoerce (mempty :: x)
+         cs = getMany_ (mempty :: Many_ xs)
+-    Many_ (a : as) `mappend` Many_ (b : bs) = Many_ (c : cs)
+-      where
+-        c = unsafeCoerce (unsafeCoerce a `mappend` (unsafeCoerce b :: x))
+-        cs = getMany_ (Many_ @xs as `mappend` Many_ @xs bs)
+-    _ `mappend` _ = error "invalid Many_ Monoid"
+ 
+ instance Monoid (Many_ xs) => Monoid (Many xs) where
+     mempty = fromMany_ (mempty :: Many_ xs)
+-    as `mappend` bs = fromMany_ (toMany_ as `mappend` toMany_ bs)
+ 
+ -----------------------------------------------------------------------
+ 
+
+
+# diff for data-inttrie-0.1.4
+diff --git a/Data/IntTrie.hs b/Data/IntTrie.hs
+index f1594a4..4a01df7 100644
+--- a/Data/IntTrie.hs
++++ b/Data/IntTrie.hs
+@@ -47,7 +47,6 @@ instance Semigroup a => Semigroup (BitTrie a) where
+ 
+ instance Monoid a => Monoid (BitTrie a) where
+     mempty = pure mempty
+-    mappend = liftA2 mappend
+ 
+ instance Functor IntTrie where
+     fmap f ~(IntTrie neg z pos) = IntTrie (fmap f neg) (f z) (fmap f pos)
+@@ -62,7 +61,6 @@ instance Semigroup a => Semigroup (IntTrie a) where
+ 
+ instance Monoid a => Monoid (IntTrie a) where
+     mempty = pure mempty
+-    mappend = liftA2 mappend
+ 
+ -- | Apply the trie to an argument.  This is the semantic map.
+ apply :: (Ord b, Num b, Bits b) => IntTrie a -> b -> a
+
+
+# diff for data-msgpack-types-0.0.3
+diff --git a/src/Data/MessagePack/Types/Option.hs b/src/Data/MessagePack/Types/Option.hs
+index 823cfef..bf4c74c 100644
+--- a/src/Data/MessagePack/Types/Option.hs
++++ b/src/Data/MessagePack/Types/Option.hs
+@@ -33,8 +33,6 @@ instance Applicative Option where
+   None   <*> _ = None
+ 
+ instance Monad Option where
+-  return = Some
+-
+   None   >>= _ = None
+   Some x >>= f = f x
+ #if (MIN_VERSION_base(4,13,0))
+diff --git a/src/Data/MessagePack/Types/Result.hs b/src/Data/MessagePack/Types/Result.hs
+index badb114..df8055b 100644
+--- a/src/Data/MessagePack/Types/Result.hs
++++ b/src/Data/MessagePack/Types/Result.hs
+@@ -36,8 +36,6 @@ instance Alternative Result where
+ 
+ 
+ instance Monad Result where
+-  return = pure
+-
+   Success x   >>= f = f x
+   Failure msg >>= _ = Failure msg
+ 
+
+
+# diff for djinn-lib-0.0.1.4
+diff --git a/src/Djinn/LJT.hs b/src/Djinn/LJT.hs
+index 8314ebc..98e3239 100644
+--- a/src/Djinn/LJT.hs
++++ b/src/Djinn/LJT.hs
+@@ -145,11 +145,10 @@ nf ee = spine ee []
+ newtype P a = P { unP :: PS -> [(PS, a)] }
+ 
+ instance Applicative P where
+-  pure  = return
++  pure x = P $ \ s -> [(s, x)]
+   (<*>) = ap
+ 
+ instance Monad P where
+-  return x  = P $ \ s -> [(s, x)]
+   P m >>= f = P $ \ s -> [ y | (s',x) <- m s, y <- unP (f x) s' ]
+ 
+ instance Functor P where
+
+
+# diff for dockerfile-0.2.0
+diff --git a/Control/Monad/Writer.hs b/Control/Monad/Writer.hs
+index 8a95000..37c6c6a 100644
+--- a/Control/Monad/Writer.hs
++++ b/Control/Monad/Writer.hs
+@@ -31,7 +31,6 @@ instance Applicative Identity where
+     Identity f <*> Identity x = Identity (f x)
+ 
+ instance Monad Identity where
+-    return a = Identity a
+     m >>= k  = k (runIdentity m)
+ 
+ 
+@@ -63,7 +62,6 @@ instance (Functor m, Monad m) => Applicative (WriterT w m) where
+     {-# INLINE (<*>) #-}
+ 
+ instance (Monad m, Monoid w) => Monad (WriterT w m) where
+-    return a = WriterT $ \w -> return (a, w)
+     m >>= f  = WriterT $ \w -> do
+         (a, w') <- unWriterT m w
+         unWriterT (f a) w'
+
+
+# diff for dotgen-0.4.3
+diff --git a/Text/Dot.hs b/Text/Dot.hs
+index 0d064f8..0a99df4 100644
+--- a/Text/Dot.hs
++++ b/Text/Dot.hs
+@@ -69,11 +69,10 @@ instance Functor Dot where
+   fmap = liftM
+ 
+ instance Applicative Dot where
+-  pure  = return
++  pure a = Dot $ \ uq -> ([],uq,a)
+   (<*>) = ap
+ 
+ instance Monad Dot where
+-  return a = Dot $ \ uq -> ([],uq,a)
+   m >>= k  = Dot $ \ uq -> case unDot m uq of
+                            (g1,uq',r) -> case unDot (k r) uq' of
+                                            (g2,uq2,r2) -> (g1 ++ g2,uq2,r2)
+
+
+# diff for drifter-0.3.0
+diff --git a/src/Drifter/Graph.hs b/src/Drifter/Graph.hs
+index 53597a0..cd0a785 100644
+--- a/src/Drifter/Graph.hs
++++ b/src/Drifter/Graph.hs
+@@ -68,8 +68,6 @@ instance Monad m => A.Applicative (EitherT e m) where
+   {-# INLINE (<*>) #-}
+ 
+ instance Monad m => Monad (EitherT e m) where
+-  return a = EitherT $ return (Right a)
+-  {-# INLINE return #-}
+   m >>= k  = EitherT $ do
+     a <- runEitherT m
+     case a of
+
+
+# diff for drinkery-0.4
+diff --git a/src/Data/Drinkery/Awaiter.hs b/src/Data/Drinkery/Awaiter.hs
+index d5e22b4..47fe4e1 100644
+--- a/src/Data/Drinkery/Awaiter.hs
++++ b/src/Data/Drinkery/Awaiter.hs
+@@ -28,7 +28,6 @@ instance Monad m => Applicative (Awaiter s m) where
+     Left f -> pure $ Left $ (<*> k) . f
+ 
+ instance Monad m => Monad (Awaiter s m) where
+-  return = pure
+   Awaiter m >>= k = Awaiter $ m >>= \case
+     Right a -> runAwaiter (k a)
+     Left f -> pure $ Left $ (>>=k) . f
+diff --git a/src/Data/Drinkery/Class.hs b/src/Data/Drinkery/Class.hs
+index 58d7cf0..b73425e 100644
+--- a/src/Data/Drinkery/Class.hs
++++ b/src/Data/Drinkery/Class.hs
+@@ -54,8 +54,6 @@ instance Applicative (Sink s m) where
+   m *> k = m >>= \_ -> k
+ 
+ instance Monad (Sink s m) where
+-  return = pure
+-  {-# INLINE return #-}
+   m >>= k = Sink $ \s cont -> unSink m s $ \a s' -> unSink (k a) s' cont
+ 
+ instance MonadTrans (Sink t) where
+diff --git a/src/Data/Drinkery/Tap.hs b/src/Data/Drinkery/Tap.hs
+index ca11022..0f81a8d 100644
+--- a/src/Data/Drinkery/Tap.hs
++++ b/src/Data/Drinkery/Tap.hs
+@@ -143,11 +143,10 @@ instance Functor (Producer r s m) where
+   fmap f (Producer m) = Producer $ \cont -> m (cont . f)
+ 
+ instance Applicative (Producer r s m) where
+-  pure = return
++  pure a = Producer ($ a)
+   Producer m <*> Producer k = Producer $ \cont -> m $ \f -> k $ cont . f
+ 
+ instance Monad (Producer r s m) where
+-  return a = Producer ($ a)
+   Producer m >>= k = Producer $ \cont -> m $ \a -> unProducer (k a) cont
+ 
+ instance MonadTrans (Producer r s) where
+@@ -193,11 +192,10 @@ instance Functor (ListT r m) where
+   fmap f m = ListT $ \c e -> unListT m (c . f) e
+ 
+ instance Applicative (ListT r m) where
+-  pure = return
++  pure s = ListT $ \c e -> c s e
+   (<*>) = ap
+ 
+ instance Monad (ListT r m) where
+-  return s = ListT $ \c e -> c s e
+   m >>= k = ListT $ \c e -> unListT m (\s -> unListT (k s) c) e
+ 
+ instance Alternative (ListT r m) where
+
+
+# diff for elerea-2.9.0
+diff --git a/FRP/Elerea/Param.hs b/FRP/Elerea/Param.hs
+index c2ff90f..fc3bab7 100644
+--- a/FRP/Elerea/Param.hs
++++ b/FRP/Elerea/Param.hs
+@@ -111,11 +111,10 @@ instance Functor (SignalGen p) where
+   fmap = liftM
+ 
+ instance Applicative (SignalGen p) where
+-  pure = return
++  pure x = SG $ \_ _ -> return x
+   (<*>) = ap
+ 
+ instance Monad (SignalGen p) where
+-  return x = SG $ \_ _ -> return x
+   SG g >>= f = SG $ \p i -> g p i >>= \x -> unSG (f x) p i
+ 
+ instance MonadFix (SignalGen p) where
+diff --git a/FRP/Elerea/Simple.hs b/FRP/Elerea/Simple.hs
+index 31e08d8..b9a8cda 100644
+--- a/FRP/Elerea/Simple.hs
++++ b/FRP/Elerea/Simple.hs
+@@ -105,11 +105,10 @@ instance Functor SignalGen where
+     fmap = liftM
+ 
+ instance Applicative SignalGen where
+-    pure = return
++    pure x = SG $ \_ -> return x
+     (<*>) = ap
+ 
+ instance Monad SignalGen where
+-    return x = SG $ \_ -> return x
+     SG g >>= f = SG $ \p -> g p >>= \x -> unSG (f x) p
+ 
+ instance MonadFix SignalGen where
+
+
+# diff for enumset-0.1
+diff --git a/src/Data/EnumBitSet.hs b/src/Data/EnumBitSet.hs
+index 84e488b..b79ef58 100644
+--- a/src/Data/EnumBitSet.hs
++++ b/src/Data/EnumBitSet.hs
+@@ -69,7 +69,6 @@ For intersection we would also not have a canonical identity element.
+ -}
+ instance (Enum a, Bits w) => Monoid (T w a) where
+    mempty = empty
+-   mappend = (.|.)
+ 
+ 
+ fromEnum :: (Enum a, Bits w) => a -> T w a
+
+
+# diff for errors-2.3.0
+diff --git a/Data/EitherR.hs b/Data/EitherR.hs
+index 61102f0..a81687a 100644
+--- a/Data/EitherR.hs
++++ b/Data/EitherR.hs
+@@ -83,11 +83,10 @@ instance Functor (EitherR r) where
+     fmap = liftM
+ 
+ instance Applicative (EitherR r) where
+-    pure  = return
++    pure e = EitherR (Left e)
+     (<*>) = ap
+ 
+ instance Monad (EitherR r) where
+-    return e = EitherR (Left e)
+     EitherR m >>= f = case m of
+         Left  e -> f e
+         Right r -> EitherR (Right r)
+@@ -136,11 +135,10 @@ instance (Monad m) => Functor (ExceptRT r m) where
+     fmap = liftM
+ 
+ instance (Monad m) => Applicative (ExceptRT r m) where
+-    pure  = return
++    pure e = ExceptRT (throwE e)
+     (<*>) = ap
+ 
+ instance (Monad m) => Monad (ExceptRT r m) where
+-    return e = ExceptRT (throwE e)
+     m >>= f = ExceptRT $ ExceptT $ do
+         x <- runExceptT $ runExceptRT m
+         runExceptT $ runExceptRT $ case x of
+
+
+# diff for essence-of-live-coding-0.2.9
+diff --git a/src/LiveCoding/CellExcept.lhs b/src/LiveCoding/CellExcept.lhs
+index 35716dd..e19a74f 100644
+--- a/src/LiveCoding/CellExcept.lhs
++++ b/src/LiveCoding/CellExcept.lhs
+@@ -44,7 +44,7 @@ instance Monad m => Functor (CellExcept a b m) where
+   fmap = liftM
+ 
+ instance Monad m => Applicative (CellExcept a b m) where
+-  pure = return
++  pure = Return
+   (<*>) = ap
+ 
+ instance MFunctor (CellExcept a b) where
+@@ -58,7 +58,6 @@ instance MFunctor (CellExcept a b) where
+ The \mintinline{haskell}{Monad} instance is now trivial:
+ \begin{code}
+ instance Monad m => Monad (CellExcept a b m) where
+-  return = Return
+   (>>=) = Bind
+ \end{code}
+ As is typical for operational monads, all of the effort now goes into the interpretation function:
+
+
+# diff for exact-pi-0.5.0.2
+diff --git a/src/Data/ExactPi.hs b/src/Data/ExactPi.hs
+index 0ea066b..035bb6e 100644
+--- a/src/Data/ExactPi.hs
++++ b/src/Data/ExactPi.hs
+@@ -197,9 +197,8 @@ approx1 f x = Approximate (f (approximateValue x))
+ 
+ -- | The multiplicative semigroup over 'Rational's augmented with multiples of 'pi'.
+ instance Semigroup ExactPi where
+-  (<>) = mappend
++  (<>) = (*)
+ 
+ -- | The multiplicative monoid over 'Rational's augmented with multiples of 'pi'.
+ instance Monoid ExactPi where
+   mempty = 1
+-  mappend = (*)
+
+
+# diff for expiring-cache-map-0.0.6.1
+diff --git a/Caching/ExpiringCacheMap/Utils/TestSequence.hs b/Caching/ExpiringCacheMap/Utils/TestSequence.hs
+index 4a0dc4a..cec6630 100644
+--- a/Caching/ExpiringCacheMap/Utils/TestSequence.hs
++++ b/Caching/ExpiringCacheMap/Utils/TestSequence.hs
+@@ -118,7 +118,10 @@ instance Functor (TestSequence a) where
+   fmap = liftM
+   
+ instance Applicative (TestSequence a) where
+-  pure = return
++  pure ret = 
++    TestSequence $
++      \(TestSequenceState (timer, hl, testsvar)) ->
++       (TestSequenceState (timer+1,hl, testsvar), ret)
+   (<*>) = ap
+ 
+ instance Monad (TestSequence a) where
+@@ -127,10 +130,6 @@ instance Monad (TestSequence a) where
+       (\state -> let (state', ret) = (fun state)
+                      TestSequence fun' = k ret
+                   in fun' state')
+-  return ret = 
+-    TestSequence $
+-      \(TestSequenceState (timer, hl, testsvar)) ->
+-       (TestSequenceState (timer+1,hl, testsvar), ret)
+ 
+ runTestSequence :: Show a => TestSequence b a -> IO (TestSequenceState b, a)
+ runTestSequence f = do
+
+
+# diff for explicit-exception-0.2
+diff --git a/src/Control/Monad/Exception/Asynchronous/Lazy.hs b/src/Control/Monad/Exception/Asynchronous/Lazy.hs
+index 22623a2..9084b30 100644
+--- a/src/Control/Monad/Exception/Asynchronous/Lazy.hs
++++ b/src/Control/Monad/Exception/Asynchronous/Lazy.hs
+@@ -218,8 +218,6 @@ instance Monoid a => Semigroup (Exceptional e a) where
+ -}
+ instance Monoid a => Monoid (Exceptional e a) where
+    mempty = pure mempty
+---   mappend = append
+-   mappend = (<>)
+ 
+ 
+ {- | construct Exceptional constructor lazily -}
+@@ -329,7 +327,6 @@ instance Applicative (Exceptional e) where
+                Exceptional e1 y -> Exceptional (mplus e0 e1) (g y)
+ 
+ instance Monad (Exceptional e) where
+-   return = pure
+    fail _msg =
+       Exceptional
+          [Just (error "Asynchronous.fail exception")]
+@@ -412,7 +409,6 @@ instance Applicative m => Applicative (ExceptionalT e m) where
+       ExceptionalT (fmap (<*>) f <*> x)
+ 
+ instance Monad m => Monad (ExceptionalT e m) where
+-   return = ExceptionalT . return . return
+    x0 >>= f =
+       ExceptionalT $
+       do Exceptional ex x <- runExceptionalT x0
+diff --git a/src/Control/Monad/Exception/Asynchronous/Strict.hs b/src/Control/Monad/Exception/Asynchronous/Strict.hs
+index 2340bc1..2ea154f 100644
+--- a/src/Control/Monad/Exception/Asynchronous/Strict.hs
++++ b/src/Control/Monad/Exception/Asynchronous/Strict.hs
+@@ -212,8 +212,6 @@ instance Monoid a => Semigroup (Exceptional e a) where
+ -}
+ instance Monoid a => Monoid (Exceptional e a) where
+    mempty = pure mempty
+---   mappend = append
+-   mappend = (<>)
+ 
+ 
+ {- | construct Exceptional constructor lazily -}
+@@ -310,7 +308,6 @@ instance Applicative (Exceptional e) where
+                Exceptional e1 y -> Exceptional (mplus e0 e1) (g y)
+ 
+ instance Monad (Exceptional e) where
+-   return = pure
+    fail _msg =
+       Exceptional
+          [Just (error "Asynchronous.fail exception")]
+@@ -392,7 +389,6 @@ instance Applicative m => Applicative (ExceptionalT e m) where
+       ExceptionalT (fmap (<*>) f <*> x)
+ 
+ instance Monad m => Monad (ExceptionalT e m) where
+-   return = ExceptionalT . return . return
+    x0 >>= f =
+       ExceptionalT $
+       do Exceptional ex x <- runExceptionalT x0
+diff --git a/src/Control/Monad/Exception/Synchronous.hs b/src/Control/Monad/Exception/Synchronous.hs
+index 594a492..3949b7b 100644
+--- a/src/Control/Monad/Exception/Synchronous.hs
++++ b/src/Control/Monad/Exception/Synchronous.hs
+@@ -260,7 +260,6 @@ instance Applicative (Exceptional e) where
+                Exception e -> Exception e
+ 
+ instance Monad (Exceptional e) where
+-   return = pure
+    x >>= f =
+       case x of
+          Exception e -> Exception e
+@@ -471,7 +470,6 @@ instance Applicative m => Applicative (ExceptionalT e m) where
+       ExceptionalT (fmap (<*>) f <*> x)
+ 
+ instance Monad m => Monad (ExceptionalT e m) where
+-   return = ExceptionalT . return . return
+    x0 >>= f =
+       ExceptionalT $
+          runExceptionalT x0 >>= \x1 ->
+diff --git a/src/Control/Monad/Exception/Warning.hs b/src/Control/Monad/Exception/Warning.hs
+index 995c298..2fe9b87 100644
+--- a/src/Control/Monad/Exception/Warning.hs
++++ b/src/Control/Monad/Exception/Warning.hs
+@@ -74,7 +74,6 @@ instance Applicative (Warnable e) where
+                Warnable e1 y -> Warnable (mplus e0 e1) (g y)
+ 
+ instance Monad (Warnable e) where
+-   return = pure
+    x >>= f =
+       case x of
+          Warnable e0 y ->
+@@ -111,7 +110,6 @@ instance Applicative m => Applicative (WarnableT e m) where
+       WarnableT (fmap (<*>) f <*> x)
+ 
+ instance Monad m => Monad (WarnableT e m) where
+-   return = WarnableT . return . return
+    x0 >>= f =
+       WarnableT $
+       do Warnable ex x <- runWarnableT x0
+
+
+# diff for fakedata-1.0.5
+diff --git a/src/Faker.hs b/src/Faker.hs
+index 8460d0c..c2864cc 100644
+--- a/src/Faker.hs
++++ b/src/Faker.hs
+@@ -236,9 +236,6 @@ instance Monad m => Applicative (FakeT m) where
+   (<*>) = ap
+ 
+ instance Monad m => Monad (FakeT m) where
+-  {-# INLINE return #-}
+-  return :: a -> FakeT m a
+-  return x = FakeT (\_ -> return x)
+   {-# INLINE (>>=) #-}
+   (>>=) :: FakeT m a -> (a -> FakeT m b) -> FakeT m b
+   f >>= k = generateNewFake f k
+@@ -270,7 +267,6 @@ instance (Semigroup a, Monad m) => Semigroup (FakeT m a) where
+ -- | @since 0.6.1
+ instance (Monoid a, Monad m) => Monoid (FakeT m a) where
+   mempty = pure mempty
+-  mappend mx my = mappend <$> mx <*> my
+ 
+ -- | Generate fake value with 'defaultFakerSettings'. This produces
+ -- deterministic output by default.
+diff --git a/src/Faker/Internal.hs b/src/Faker/Internal.hs
+index de71314..c7ebdf0 100644
+--- a/src/Faker/Internal.hs
++++ b/src/Faker/Internal.hs
+@@ -65,7 +65,6 @@ instance Applicative Unresolved where
+   Unresolved f1 <*> Unresolved f2 = pure $ f1 f2
+ 
+ instance Monad Unresolved where
+-  return = pure
+   (Unresolved f) >>= f1 = f1 f
+ 
+ -- | Get the Locale settings for your fake data source as a YAML  key.
+
+
+# diff for ghcjs-perch-0.3.3.3
+diff --git a/src/Internal/Perch.hs b/src/Internal/Perch.hs
+index e447529..829f1a4 100644
+--- a/src/Internal/Perch.hs
++++ b/src/Internal/Perch.hs
+@@ -70,7 +70,6 @@ instance Applicative PerchM
+ instance Monad PerchM where
+   (>>) x y = mappend (unsafeCoerce x) y
+   (>>=) = error "bind (>>=) invocation in the Perch monad creating DOM elements"
+-  return = mempty
+ 
+ instance MonadIO PerchM where
+   liftIO io = Perch . withPerch $ const io
+
+
+# diff for gloss-rendering-1.13.2.1
+diff --git a/Graphics/Gloss/Internals/Data/Picture.hs b/Graphics/Gloss/Internals/Data/Picture.hs
+index 5b0ad61..8c15297 100644
+--- a/Graphics/Gloss/Internals/Data/Picture.hs
++++ b/Graphics/Gloss/Internals/Data/Picture.hs
+@@ -119,7 +119,9 @@ data Picture
+ -- Instances ------------------------------------------------------------------
+ instance Monoid Picture where
+   mempty          = Blank
++#if __GLASGOW_HASKELL__ < 800
+   mappend a b     = Pictures [a, b]
++#endif
+   mconcat         = Pictures
+ 
+ #if __GLASGOW_HASKELL__ >= 800
+
+
+# diff for graphite-0.10.0.1
+diff --git a/src/Data/Graph/DGraph.hs b/src/Data/Graph/DGraph.hs
+index 159f339..6c78e27 100644
+--- a/src/Data/Graph/DGraph.hs
++++ b/src/Data/Graph/DGraph.hs
+@@ -74,10 +74,9 @@ instance (Hashable v, Eq v, Read v, Read e) => Read (DGraph v e) where
+ 
+ instance (Hashable v, Eq v) => Monoid (DGraph v e) where
+     mempty = empty
+-    mappend = union
+ 
+ instance (Hashable v, Eq v) => Semigroup (DGraph v e) where
+-    (<>) = mappend
++    (<>) = union
+ 
+ instance (Hashable v, Eq v) => Functor (DGraph v) where
+     fmap f (DGraph s g) = DGraph s $ fmap (fmap f) g
+diff --git a/src/Data/Graph/UGraph.hs b/src/Data/Graph/UGraph.hs
+index c0913cd..146b83a 100644
+--- a/src/Data/Graph/UGraph.hs
++++ b/src/Data/Graph/UGraph.hs
+@@ -60,10 +60,9 @@ instance (Hashable v, Eq v, Read v, Read e) => Read (UGraph v e) where
+ 
+ instance (Hashable v, Eq v) => Monoid (UGraph v e) where
+     mempty = empty
+-    mappend = union
+ 
+ instance (Hashable v, Eq v) => Semigroup (UGraph v e) where
+-    (<>) = mappend
++    (<>) = union
+ 
+ instance (Hashable v, Eq v) => Functor (UGraph v) where
+     fmap f (UGraph s g) = UGraph s $ fmap (fmap f) g
+
+
+# diff for graphviz-2999.20.2.1
+diff --git a/Data/GraphViz/Types/Monadic.hs b/Data/GraphViz/Types/Monadic.hs
+index 36d6b7d..fe36e96 100644
+--- a/Data/GraphViz/Types/Monadic.hs
++++ b/Data/GraphViz/Types/Monadic.hs
+@@ -136,7 +136,9 @@ instance Semigroup a => Semigroup (DotM n a) where
+ #endif
+ 
+ instance Monoid a => Monoid (DotM n a) where
++#if !(MIN_VERSION_base (4,9,0))
+   mappend (DotM x1) (DotM x2) = DotM (mappend x1 x2)
++#endif
+   mempty = DotM mempty
+ 
+ tell :: DotStmts n -> Dot n
+
+
+# diff for happstack-server-7.9.3
+diff --git a/src/Happstack/Server/Internal/Monads.hs b/src/Happstack/Server/Internal/Monads.hs
+index a440459..64cb4b5 100644
+--- a/src/Happstack/Server/Internal/Monads.hs
++++ b/src/Happstack/Server/Internal/Monads.hs
+@@ -77,9 +77,9 @@ type ServerPart a = ServerPartT IO a
+ -- see also: 'simpleHTTP', 'ServerMonad', 'FilterMonad', 'WebMonad', and 'HasRqData'
+ newtype ServerPartT m a = ServerPartT { unServerPartT :: ReaderT Request (WebT m) a }
+ #if MIN_VERSION_base(4,9,0)
+-    deriving (Monad, MonadFail, MonadPlus, Functor)
++    deriving (Monad, Applicative, MonadFail, MonadPlus, Functor)
+ #else
+-    deriving (Monad, MonadPlus, Functor)
++    deriving (Monad, Applicative, MonadPlus, Functor)
+ #endif
+ 
+ instance MonadCatch m => MonadCatch (ServerPartT m) where
+@@ -188,10 +188,6 @@ instance (Monad m, MonadPlus m) => Monoid (ServerPartT m a) where
+     mempty  = mzero
+     mappend = (SG.<>)
+ 
+-instance (Monad m, Functor m) => Applicative (ServerPartT m) where
+-    pure = return
+-    (<*>) = ap
+-
+ instance (Functor m, MonadPlus m) => Alternative (ServerPartT m) where
+     empty = mzero
+     (<|>) = mplus
+@@ -462,8 +458,6 @@ type UnWebT m a = m (Maybe (Either Response a, FilterFun Response))
+ instance Monad m => Monad (WebT m) where
+     m >>= f = WebT $ unWebT m >>= unWebT . f
+     {-# INLINE (>>=) #-}
+-    return a = WebT $ return a
+-    {-# INLINE return #-}
+ 
+ #if MIN_VERSION_base(4,9,0)
+ instance MonadFail m => MonadFail (WebT m) where
+@@ -552,7 +546,8 @@ localContext fn hs
+     = withRequest $ \rq -> fn (runServerPartT hs rq)
+ 
+ instance (Monad m, Functor m) => Applicative (WebT m) where
+-    pure = return
++    pure a = WebT $ return a
++    {-# INLINE pure #-}
+     (<*>) = ap
+ 
+ instance (Functor m, MonadPlus m) => Alternative (WebT m) where
+diff --git a/src/Happstack/Server/RqData.hs b/src/Happstack/Server/RqData.hs
+index 17ad891..5245154 100644
+--- a/src/Happstack/Server/RqData.hs
++++ b/src/Happstack/Server/RqData.hs
+@@ -114,7 +114,7 @@ instance (Monoid e) => Applicative (ReaderError r e) where
+ #else
+ instance (Monoid e, DeprecatedError.Error e) => Applicative (ReaderError r e) where
+ #endif
+-    pure = return
++    pure = ReaderError . pure
+     (ReaderError (ReaderT f)) <*> (ReaderError (ReaderT a))
+         = ReaderError $ ReaderT $ \env -> (f env) `apEither` (a env)
+ 
+
+
+# diff for happy-meta-0.2.1.0
+diff --git a/src/ParseMonad.lhs b/src/ParseMonad.lhs
+index 1bf6f20..3b3ead3 100644
+--- a/src/ParseMonad.lhs
++++ b/src/ParseMonad.lhs
+@@ -27,7 +27,6 @@
+ 
+ 
+ > instance Monad P where
+->	return m = P $ \ _ _ -> OkP m
+ >	m >>= k =  P $ \s l -> case runP m s l of
+ >		OkP a -> runP (k a) s l
+ >		FailP err -> FailP err
+@@ -40,4 +39,4 @@
+ 
+ > instance Applicative P where
+ >   (<*>) = ap
+->   pure = return
++>   pure m = P $ \ _ _ -> OkP m
+
+
+# diff for heap-1.0.4
+diff --git a/Data/Heap/Internal.hs b/Data/Heap/Internal.hs
+index 9806a3f..a75e28a 100644
+--- a/Data/Heap/Internal.hs
++++ b/Data/Heap/Internal.hs
+@@ -72,7 +72,6 @@ instance (Ord prio) => Semigroup (HeapT prio val) where
+ 
+ instance (Ord prio) => Monoid (HeapT prio val) where
+     mempty  = empty
+-    mappend = union
+     mconcat = unions
+ 
+ instance Functor (HeapT prio) where
+
+
+# diff for heist-1.1.1.2
+diff --git a/src/Heist/Internal/Types/HeistState.hs b/src/Heist/Internal/Types/HeistState.hs
+index ed9f537..b4dc740 100644
+--- a/src/Heist/Internal/Types/HeistState.hs
++++ b/src/Heist/Internal/Types/HeistState.hs
+@@ -386,15 +386,13 @@ instance Functor m => Functor (HeistT n m) where
+ ------------------------------------------------------------------------------
+ -- | Applicative instance
+ instance (Monad m, Functor m) => Applicative (HeistT n m) where
+-    pure = return
++    pure a = HeistT (\_ s -> return (a, s))
+     (<*>) = ap
+ 
+ 
+ ------------------------------------------------------------------------------
+ -- | Monad instance
+ instance Monad m => Monad (HeistT n m) where
+-    return a = HeistT (\_ s -> return (a, s))
+-    {-# INLINE return #-}
+     HeistT m >>= k = HeistT $ \r s -> do
+         (a, s') <- m r s
+         runHeistT (k a) r s'
+
+
+# diff for hformat-0.3.3.1
+diff --git a/src/Text/Format.hs b/src/Text/Format.hs
+index 60d76fb..7c21110 100644
+--- a/src/Text/Format.hs
++++ b/src/Text/Format.hs
+@@ -56,7 +56,6 @@ instance Semigroup Formatted where
+ 
+ instance Monoid Formatted where
+ 	mempty = Formatted []
+-	Formatted l `mappend` Formatted r = Formatted $ l ++ r
+ 
+ withFlags ∷ String → [String] → Formatted
+ withFlags v fs = Formatted [FormattedPart fs v]
+
+
+# diff for histogram-fill-0.9.1.0
+diff --git a/Data/Histogram/Fill.hs b/Data/Histogram/Fill.hs
+index fce1a8d..a72d8fc 100644
+--- a/Data/Histogram/Fill.hs
++++ b/Data/Histogram/Fill.hs
+@@ -241,10 +241,8 @@ instance (Monad m, Monoid b) => Monoid (HBuilderM m a b) where
+     mempty = HBuilderM { hbInput  = \_ -> return ()
+                        , hbOutput = return mempty
+                        }
+-    mappend = liftA2 mappend
+     mconcat = fmap mconcat . F.sequenceA
+     {-# INLINE mempty  #-}
+-    {-# INLINE mappend #-}
+     {-# INLINE mconcat #-}
+ 
+ 
+@@ -300,10 +298,8 @@ instance Semigroup b => Semigroup (HBuilder a b) where
+     {-# INLINE (<>) #-}
+ instance Monoid b => Monoid (HBuilder a b) where
+     mempty  = HBuilder (return mempty)
+-    mappend = liftA2 mappend
+     mconcat = fmap mconcat . F.sequenceA
+     {-# INLINE mempty  #-}
+-    {-# INLINE mappend #-}
+     {-# INLINE mconcat #-}
+ 
+ 
+
+
+# diff for hmatrix-0.20.2
+diff --git a/src/Numeric/Matrix.hs b/src/Numeric/Matrix.hs
+index 6e3db61..5fa7da9 100644
+--- a/src/Numeric/Matrix.hs
++++ b/src/Numeric/Matrix.hs
+@@ -100,13 +100,12 @@ adaptScalarM f1 f2 f3 x y
+ 
+ instance (Container Vector t, Eq t, Num (Vector t), Product t) => S.Semigroup (Matrix t)
+   where
+-    (<>) = mappend
++    (<>) = adaptScalarM scale mXm (flip scale)
+     sconcat = mconcat . F.toList
+ 
+ instance (Container Vector t, Eq t, Num (Vector t), Product t) => M.Monoid (Matrix t)
+   where
+     mempty = 1
+-    mappend = adaptScalarM scale mXm (flip scale)
+ 
+     mconcat xs = work (partition isScalar xs)
+       where
+
+
+# diff for HPDF-1.8
+diff --git a/Graphics/PDF/Draw.hs b/Graphics/PDF/Draw.hs
+index 6511fd9..abd7e18 100644
+--- a/Graphics/PDF/Draw.hs
++++ b/Graphics/PDF/Draw.hs
+@@ -214,7 +214,6 @@ instance Monad Draw where
+     m >>= f  = Draw $ \env -> do
+                           a <- unDraw m env
+                           unDraw (f a) env
+-    return x = Draw $ \_env -> return x
+ 
+ instance MonadReader DrawEnvironment Draw where
+    ask       = Draw $ \env -> return (drawEnvironment env)
+
+
+# diff for HTF-0.15.0.2
+diff --git a/Test/Framework/AssertM.hs b/Test/Framework/AssertM.hs
+index dcaeeaf..52a7a16 100644
+--- a/Test/Framework/AssertM.hs
++++ b/Test/Framework/AssertM.hs
+@@ -61,7 +61,6 @@ instance Applicative AssertBool where
+     (<*>) = ap
+ 
+ instance Monad AssertBool where
+-    return = AssertOk
+     AssertFailed stack msg >>= _ = AssertFailed stack msg
+     AssertOk x >>= k = k x
+ #if !(MIN_VERSION_base(4,13,0))
+
+
+# diff for hxt-tagsoup-9.1.4
+diff --git a/src/Text/XML/HXT/Parser/TagSoup.hs b/src/Text/XML/HXT/Parser/TagSoup.hs
+index bfb0977..cd08470 100644
+--- a/src/Text/XML/HXT/Parser/TagSoup.hs
++++ b/src/Text/XML/HXT/Parser/TagSoup.hs
+@@ -73,11 +73,10 @@ instance Functor Parser where
+     fmap = liftM
+ 
+ instance Applicative Parser where
+-    pure  = return
++    pure x    = P $ \ ts -> (x, ts)
+     (<*>) = ap
+ 
+ instance Monad Parser where
+-    return x    = P $ \ ts -> (x, ts)
+     p >>= f     = P $ \ ts -> let
+                               (res, ts') = parse p ts
+                               in
+
+
+# diff for iconv-0.4.1.3
+diff --git a/Codec/Text/IConv/Internal.hs b/Codec/Text/IConv/Internal.hs
+index a7e551c..d75d3f9 100644
+--- a/Codec/Text/IConv/Internal.hs
++++ b/Codec/Text/IConv/Internal.hs
+@@ -215,7 +215,6 @@ instance Monad IConv where
+   (>>=)  = bindI
+ --  m >>= f = (m `bindI` \a -> consistencyCheck `thenI` returnI a) `bindI` f
+   (>>)   = thenI
+-  return = returnI
+ 
+ returnI :: a -> IConv a
+ returnI a = I $ \_ bufs -> return (bufs, a)
+
+
+# diff for invertible-0.2.0.8
+diff --git a/Data/Invertible/Monoid.hs b/Data/Invertible/Monoid.hs
+index 3faabd2..d842c80 100644
+--- a/Data/Invertible/Monoid.hs
++++ b/Data/Invertible/Monoid.hs
+@@ -41,7 +41,9 @@ instance Semigroup (BiEndo a) where
+ 
+ instance Monoid (BiEndo a) where
+   mempty = BiEndo C.id
++#if !MIN_VERSION_base(4,11,0)
+   BiEndo f `mappend` BiEndo g = BiEndo (f C.. g)
++#endif
+ 
+ -- |(Un)wrap the 'BiEndo' monoid.
+ biEndo :: (a <-> a) <-> BiEndo a
+
+
+# diff for io-streams-1.5.2.2
+diff --git a/src/System/IO/Streams/Internal.hs b/src/System/IO/Streams/Internal.hs
+index a568a9a..8ffab7e 100644
+--- a/src/System/IO/Streams/Internal.hs
++++ b/src/System/IO/Streams/Internal.hs
+@@ -596,7 +596,6 @@ generatorBind (Generator m) f = Generator (m >>= either step value)
+ 
+ ------------------------------------------------------------------------------
+ instance Monad (Generator r) where
+-   return = Generator . return . Right
+    (>>=)  = generatorBind
+ 
+ 
+@@ -656,7 +655,6 @@ newtype Consumer c a = Consumer {
+ 
+ ------------------------------------------------------------------------------
+ instance Monad (Consumer c) where
+-    return = Consumer . return . Right
+ 
+     (Consumer m) >>= f = Consumer $ m >>= either step value
+       where
+@@ -679,7 +677,7 @@ instance Functor (Consumer r) where
+ 
+ ------------------------------------------------------------------------------
+ instance Applicative (Consumer r) where
+-    pure = return
++    pure = Consumer . return . Right
+ 
+     m <*> n = do
+         f <- m
+
+
+# diff for jmacro-0.6.18
+diff --git a/Language/Javascript/JMacro/Base.hs b/Language/Javascript/JMacro/Base.hs
+index 937820d..1720c03 100644
+--- a/Language/Javascript/JMacro/Base.hs
++++ b/Language/Javascript/JMacro/Base.hs
+@@ -153,7 +153,6 @@ instance Semigroup JStat where
+ 
+ instance Monoid JStat where
+     mempty = BlockStat []
+-    mappend x y = x <> y
+ 
+ 
+ -- TODO: annotate expressions with type
+diff --git a/Language/Javascript/JMacro/TypeCheck.hs b/Language/Javascript/JMacro/TypeCheck.hs
+index 0df4e68..8942a97 100644
+--- a/Language/Javascript/JMacro/TypeCheck.hs
++++ b/Language/Javascript/JMacro/TypeCheck.hs
+@@ -105,11 +105,7 @@ instance Show TCState where
+ tcStateEmpty :: TCState
+ tcStateEmpty = TCS [M.empty] M.empty [S.empty] S.empty 0 []
+ 
+-newtype TMonad a = TMonad (ExceptT String (State TCState) a) deriving (Functor, Monad, MonadState TCState, MonadError String)
+-
+-instance Applicative TMonad where
+-    pure = return
+-    (<*>) = ap
++newtype TMonad a = TMonad (ExceptT String (State TCState) a) deriving (Functor, Applicative, Monad, MonadState TCState, MonadError String)
+ 
+ class JTypeCheck a where
+     typecheck :: a -> TMonad JType
+
+
+# diff for json-0.11
+diff --git a/Text/JSON.hs b/Text/JSON.hs
+index cdeaef8..fb0358c 100644
+--- a/Text/JSON.hs
++++ b/Text/JSON.hs
+@@ -124,7 +124,7 @@ instance Functor Result where fmap = liftM
+ 
+ instance Applicative Result where
+   (<*>) = ap
+-  pure  = return
++  pure x      = Ok x
+ 
+ instance Alternative Result where
+   Ok a    <|> _ = Ok a
+@@ -137,7 +137,6 @@ instance MonadPlus Result where
+   mzero          = Error "Result: MonadPlus.empty"
+ 
+ instance Monad Result where
+-  return x      = Ok x
+   Ok a >>= f    = f a
+   Error x >>= _ = Error x
+ 
+diff --git a/Text/JSON/String.hs b/Text/JSON/String.hs
+index fd36852..9782822 100644
+--- a/Text/JSON/String.hs
++++ b/Text/JSON/String.hs
+@@ -51,11 +51,10 @@ newtype GetJSON a = GetJSON { un :: String -> Either String (a,String) }
+ 
+ instance Functor GetJSON where fmap = liftM
+ instance A.Applicative GetJSON where
+-  pure  = return
++  pure x        = GetJSON (\s -> Right (x,s))
+   (<*>) = ap
+ 
+ instance Monad GetJSON where
+-  return x        = GetJSON (\s -> Right (x,s))
+   GetJSON m >>= f = GetJSON (\s -> case m s of
+                                      Left err -> Left err
+                                      Right (a,s1) -> un (f a) s1)
+
+
+# diff for lattices-2.2.1.1
+diff --git a/src/Algebra/Heyting/Free.hs b/src/Algebra/Heyting/Free.hs
+index 29f3ca4..999565d 100644
+--- a/src/Algebra/Heyting/Free.hs
++++ b/src/Algebra/Heyting/Free.hs
+@@ -111,7 +111,6 @@ instance Applicative Free where
+     (<*>) = ap
+ 
+ instance Monad Free where
+-    return = pure
+     (>>=)  = substFree
+ 
+ -------------------------------------------------------------------------------
+diff --git a/src/Algebra/Heyting/Free/Expr.hs b/src/Algebra/Heyting/Free/Expr.hs
+index 24952fa..8cc4bf4 100644
+--- a/src/Algebra/Heyting/Free/Expr.hs
++++ b/src/Algebra/Heyting/Free/Expr.hs
+@@ -45,7 +45,6 @@ instance Applicative Expr where
+     (<*>) = ap
+ 
+ instance Monad Expr where
+-    return = pure
+ 
+     Var x      >>= k = k x
+     Bottom     >>= _ = Bottom
+diff --git a/src/Algebra/Lattice.hs b/src/Algebra/Lattice.hs
+index c6a7c24..ca7dd7e 100644
+--- a/src/Algebra/Lattice.hs
++++ b/src/Algebra/Lattice.hs
+@@ -362,7 +362,6 @@ instance Lattice a => Semigroup (Join a) where
+ 
+ instance BoundedJoinSemiLattice a => Monoid (Join a) where
+   mempty = Join bottom
+-  Join a `mappend` Join b = Join (a \/ b)
+ 
+ instance (Eq a, Lattice a) => PO.PartialOrd (Join a) where
+   leq (Join a) (Join b) = joinLeq a b
+@@ -376,7 +375,6 @@ instance Applicative Join where
+   _ *> x = x
+ 
+ instance Monad Join where
+-  return = pure
+   Join m >>= f = f m
+   (>>) = (*>)
+ 
+@@ -398,7 +396,6 @@ instance Lattice a => Semigroup (Meet a) where
+ 
+ instance BoundedMeetSemiLattice a => Monoid (Meet a) where
+   mempty = Meet top
+-  Meet a `mappend` Meet b = Meet (a /\ b)
+ 
+ instance (Eq a, Lattice a) => PO.PartialOrd (Meet a) where
+   leq (Meet a) (Meet b) = meetLeq a b
+@@ -412,7 +409,6 @@ instance Applicative Meet where
+   _ *> x = x
+ 
+ instance Monad Meet where
+-  return = pure
+   Meet m >>= f = f m
+   (>>) = (*>)
+ 
+diff --git a/src/Algebra/Lattice/Divisibility.hs b/src/Algebra/Lattice/Divisibility.hs
+index 382894a..e7d0942 100644
+--- a/src/Algebra/Lattice/Divisibility.hs
++++ b/src/Algebra/Lattice/Divisibility.hs
+@@ -44,11 +44,10 @@ newtype Divisibility a = Divisibility { getDivisibility :: a }
+            )
+ 
+ instance Applicative Divisibility where
+-  pure = return
++  pure           = Divisibility
+   (<*>) = ap
+ 
+ instance Monad Divisibility where
+-  return           = Divisibility
+   Divisibility x >>= f  = f x
+ 
+ instance NFData a => NFData (Divisibility a) where
+diff --git a/src/Algebra/Lattice/Dropped.hs b/src/Algebra/Lattice/Dropped.hs
+index d2acae0..e40d5a6 100644
+--- a/src/Algebra/Lattice/Dropped.hs
++++ b/src/Algebra/Lattice/Dropped.hs
+@@ -48,11 +48,10 @@ data Dropped a = Drop a
+            )
+ 
+ instance Applicative Dropped where
+-  pure = return
++  pure        = Drop
+   (<*>) = ap
+ 
+ instance Monad Dropped where
+-  return        = Drop
+   Top >>= _     = Top
+   Drop x >>= f  = f x
+ 
+diff --git a/src/Algebra/Lattice/Free.hs b/src/Algebra/Lattice/Free.hs
+index 096a723..3411c66 100644
+--- a/src/Algebra/Lattice/Free.hs
++++ b/src/Algebra/Lattice/Free.hs
+@@ -104,7 +104,6 @@ instance Applicative Free where
+     (<*>) = ap
+ 
+ instance Monad Free where
+-    return = pure
+     (>>=)  = substFree
+ 
+ -------------------------------------------------------------------------------
+diff --git a/src/Algebra/Lattice/Levitated.hs b/src/Algebra/Lattice/Levitated.hs
+index a89e2fe..2b97e9f 100644
+--- a/src/Algebra/Lattice/Levitated.hs
++++ b/src/Algebra/Lattice/Levitated.hs
+@@ -50,11 +50,10 @@ data Levitated a = Bottom
+            )
+ 
+ instance Applicative Levitated where
+-  pure = return
++  pure            = Levitate
+   (<*>) = ap
+ 
+ instance Monad Levitated where
+-  return            = Levitate
+   Top >>= _         = Top
+   Bottom >>= _      = Bottom
+   Levitate x >>= f  = f x
+diff --git a/src/Algebra/Lattice/Lexicographic.hs b/src/Algebra/Lattice/Lexicographic.hs
+index f98564b..3205887 100644
+--- a/src/Algebra/Lattice/Lexicographic.hs
++++ b/src/Algebra/Lattice/Lexicographic.hs
+@@ -56,12 +56,11 @@ data Lexicographic k v = Lexicographic !k !v
+            )
+ 
+ instance BoundedJoinSemiLattice k => Applicative (Lexicographic k) where
+-  pure = return
++  pure                   =  Lexicographic bottom
+   (<*>) = ap
+ 
+ -- Essentially the Writer monad.
+ instance BoundedJoinSemiLattice k => Monad (Lexicographic k) where
+-  return                   =  Lexicographic bottom
+   Lexicographic k v >>= f  =
+     case f v of
+       Lexicographic k' v' -> Lexicographic (k \/ k') v'
+diff --git a/src/Algebra/Lattice/Lifted.hs b/src/Algebra/Lattice/Lifted.hs
+index 205559b..2980e87 100644
+--- a/src/Algebra/Lattice/Lifted.hs
++++ b/src/Algebra/Lattice/Lifted.hs
+@@ -48,11 +48,10 @@ data Lifted a = Bottom
+            )
+ 
+ instance Applicative Lifted where
+-  pure = return
++  pure        = Lift
+   (<*>) = ap
+ 
+ instance Monad Lifted where
+-  return        = Lift
+   Bottom >>= _  = Bottom
+   Lift x >>= f  = f x
+ 
+diff --git a/src/Algebra/Lattice/Op.hs b/src/Algebra/Lattice/Op.hs
+index ca4dd5d..6daf5a7 100644
+--- a/src/Algebra/Lattice/Op.hs
++++ b/src/Algebra/Lattice/Op.hs
+@@ -46,11 +46,10 @@ instance Ord a => Ord (Op a) where
+   compare (Op a) (Op b) = compare b a
+ 
+ instance Applicative Op where
+-  pure = return
++  pure      = Op
+   (<*>) = ap
+ 
+ instance Monad Op where
+-  return      = Op
+   Op x >>= f  = f x
+ 
+ instance NFData a => NFData (Op a) where
+diff --git a/src/Algebra/Lattice/Ordered.hs b/src/Algebra/Lattice/Ordered.hs
+index d3a0d53..7ad209e 100644
+--- a/src/Algebra/Lattice/Ordered.hs
++++ b/src/Algebra/Lattice/Ordered.hs
+@@ -46,11 +46,10 @@ newtype Ordered a = Ordered { getOrdered :: a }
+            )
+ 
+ instance Applicative Ordered where
+-  pure = return
++  pure           = Ordered
+   (<*>) = ap
+ 
+ instance Monad Ordered where
+-  return           = Ordered
+   Ordered x >>= f  = f x
+ 
+ instance NFData a => NFData (Ordered a) where
+diff --git a/src/Algebra/Lattice/Wide.hs b/src/Algebra/Lattice/Wide.hs
+index 751502e..61faedd 100644
+--- a/src/Algebra/Lattice/Wide.hs
++++ b/src/Algebra/Lattice/Wide.hs
+@@ -52,11 +52,10 @@ data Wide a
+            )
+ 
+ instance Applicative Wide where
+-  pure = return
++  pure       = Middle
+   (<*>) = ap
+ 
+ instance Monad Wide where
+-  return       = Middle
+   Top >>= _    = Top
+   Bottom >>= _ = Bottom
+   Middle x >>= f = f x
+
+
+# diff for lazyio-0.1.0.4
+diff --git a/src/System/IO/Lazy.hs b/src/System/IO/Lazy.hs
+index 9b445d6..a36bc4c 100644
+--- a/src/System/IO/Lazy.hs
++++ b/src/System/IO/Lazy.hs
+@@ -61,7 +61,6 @@ data RunAll = RunAll
+    deriving Show
+ 
+ instance Monad T where
+-   return x = Cons $ return x
+    x >>= f = Cons $
+       mapStateT Unsafe.interleaveIO . decons . f =<<
+       mapStateT Unsafe.interleaveIO (decons x)
+@@ -70,7 +69,7 @@ instance Functor T where
+    fmap f = Cons . fmap f . decons
+ 
+ instance Applicative T where
+-   pure = return
++   pure x = Cons $ return x
+    (<*>) = ap
+ 
+ interleave :: IO a -> T a
+
+
+# diff for lazyppl-1.0.1
+diff --git a/src/LazyPPL.hs b/src/LazyPPL.hs
+index f716b82..d65aa91 100644
+--- a/src/LazyPPL.hs
++++ b/src/LazyPPL.hs
+@@ -91,13 +91,12 @@ splitTree (Tree r (t : ts)) = (t , Tree r ts)
+ -- 
+ -- This monad structure is strongly inspired by the probability monad of [quasi-Borel space](https://ncatlab.org/nlab/show/quasi-Borel+space#probability_distributions). 
+ instance Monad Prob where
+-  return a = Prob $ const a
+   (Prob m) >>= f = Prob $ \g ->
+     let (g1, g2) = splitTree g
+         (Prob m') = f (m g1)
+     in m' g2
+ instance Functor Prob where fmap = liftM
+-instance Applicative Prob where {pure = return ; (<*>) = ap}
++instance Applicative Prob where {pure a = Prob $ const a ; (<*>) = ap}
+ 
+ {- | An unnormalized measure is represented by a probability distribution over pairs of a weight and a result. -}
+ newtype Meas a = Meas (WriterT (Product (Log Double)) Prob a)
+
+
+# diff for lens-family-core-2.1.3
+diff --git a/src/Lens/Family.hs b/src/Lens/Family.hs
+index f3b0b23..9826ab0 100644
+--- a/src/Lens/Family.hs
++++ b/src/Lens/Family.hs
+@@ -496,17 +496,15 @@ newtype Last a = Last { getLast :: Maybe a }
+ 
+ instance Monoid (First a) where
+   mempty = First Nothing
+-  (First Nothing) `mappend` b = b
+-  a `mappend` _ = a
+ 
+ instance Monoid (Last a) where
+   mempty = Last Nothing
+-  a `mappend` (Last Nothing) = a
+-  _ `mappend` b = b
+ 
+ instance Semigroup (First a) where
+-  (<>) = mappend
++  (First Nothing) <> b = b
++  a <> _ = a
+ 
+ instance Semigroup (Last a) where
+-  (<>) = mappend
++  a <> (Last Nothing) = a
++  _ <> b = b
+ 
+
+
+# diff for libmpd-0.10.0.1
+diff --git a/src/Network/MPD/Applicative/Internal.hs b/src/Network/MPD/Applicative/Internal.hs
+index d281942..30cc51a 100644
+--- a/src/Network/MPD/Applicative/Internal.hs
++++ b/src/Network/MPD/Applicative/Internal.hs
+@@ -45,14 +45,13 @@ newtype Parser a
+       deriving Functor
+ 
+ instance Monad Parser where
+-    return a  = Parser $ \input -> Right (a, input)
+     p1 >>= p2 = Parser $ \input -> runParser p1 input >>= uncurry (runParser . p2)
+ 
+ instance Fail.MonadFail Parser where
+     fail = Prelude.fail
+ 
+ instance Applicative Parser where
+-    pure  = return
++    pure a  = Parser $ \input -> Right (a, input)
+     (<*>) = ap
+ 
+ -- | Convert a regular parser.
+diff --git a/src/Network/MPD/Commands/Query.hs b/src/Network/MPD/Commands/Query.hs
+index 98a9491..58627e9 100644
+--- a/src/Network/MPD/Commands/Query.hs
++++ b/src/Network/MPD/Commands/Query.hs
+@@ -77,15 +77,14 @@ toExpr (m:ms) = ExprAnd (Exact m) (toExpr ms)
+ 
+ instance Monoid Query where
+     mempty  = Query []
+-    Query  a  `mappend` Query    b  = Query (a ++ b)
+-    Query  [] `mappend` Filter   b  = Filter b
+-    Filter a  `mappend` Query    [] = Filter a
+-    Query  a  `mappend` Filter   b  = Filter (ExprAnd (toExpr a) b)
+-    Filter a  `mappend` Query    b  = Filter (ExprAnd a (toExpr b))
+-    Filter a  `mappend` Filter   b  = Filter (a <> b)
+ 
+ instance Semigroup Query where
+-    (<>) = mappend
++    Query  a  <> Query    b  = Query (a ++ b)
++    Query  [] <> Filter   b  = Filter b
++    Filter a  <> Query    [] = Filter a
++    Query  a  <> Filter   b  = Filter (ExprAnd (toExpr a) b)
++    Filter a  <> Query    b  = Filter (ExprAnd a (toExpr b))
++    Filter a  <> Filter   b  = Filter (a <> b)
+ instance Semigroup Expr where
+   ex1 <> ex2 = ExprAnd ex1 ex2
+ 
+diff --git a/src/Network/MPD/Core.hs b/src/Network/MPD/Core.hs
+index eb78bb6..97de19a 100644
+--- a/src/Network/MPD/Core.hs
++++ b/src/Network/MPD/Core.hs
+@@ -85,11 +85,7 @@ newtype MPD a =
+     MPD { runMPD :: ExceptT MPDError
+                     (StateT MPDState
+                      (ReaderT (Host, Port) IO)) a
+-        } deriving (Functor, Monad, MonadIO, MonadError MPDError)
+-
+-instance Applicative MPD where
+-    (<*>) = ap
+-    pure  = return
++        } deriving (Functor, Applicative, Monad, MonadIO, MonadError MPDError)
+ 
+ instance MonadMPD MPD where
+     open  = mpdOpen
+
+
+# diff for mandrill-0.5.8.0
+diff --git a/src/Network/API/Mandrill/Types.hs b/src/Network/API/Mandrill/Types.hs
+index 007872f..3d7e932 100644
+--- a/src/Network/API/Mandrill/Types.hs
++++ b/src/Network/API/Mandrill/Types.hs
+@@ -165,7 +165,9 @@ instance Semigroup MandrillHtml where
+ 
+ instance Monoid MandrillHtml where
+   mempty = MandrillHtml mempty
++#if !MIN_VERSION_base(4,11,0)
+   mappend (MandrillHtml m1) (MandrillHtml m2) = MandrillHtml (m1 <> m2)
++#endif
+ 
+ instance Show MandrillHtml where
+   show (MandrillHtml h) = show $ Blaze.renderHtml h
+
+
+# diff for matrix-static-0.3
+diff --git a/src/Data/Matrix/Static.hs b/src/Data/Matrix/Static.hs
+index b57ca4a..11ee42a 100644
+--- a/src/Data/Matrix/Static.hs
++++ b/src/Data/Matrix/Static.hs
+@@ -128,8 +128,8 @@ newtype Matrix (m :: Nat) (n :: Nat) (a :: Type) = Matrix (M.Matrix a)
+   deriving ( Eq, Functor, Foldable, Traversable , NFData )
+ 
+ #if MIN_VERSION_base(4,10,0)
+-instance (KnownNat m, KnownNat n, Monoid a) => S.Semigroup (Matrix m n a) where
+-    (<>) = mappend
++instance (KnownNat m, KnownNat n, Semigroup a) => S.Semigroup (Matrix m n a) where
++    (<>) = liftA2 (<>)
+ #endif
+ 
+ instance (KnownNat m, KnownNat n) => Applicative (Matrix m n) where
+@@ -138,7 +138,9 @@ instance (KnownNat m, KnownNat n) => Applicative (Matrix m n) where
+ 
+ instance (KnownNat m, KnownNat n, Monoid a) => Monoid (Matrix m n a) where
+   mempty = pure mempty
++#if !MIN_VERSION_base(4,10,0)
+   mappend = liftA2 mappend
++#endif
+ 
+ nrows :: forall m n a. KnownNat m => Matrix m n a -> Int
+ nrows = const m
+
+
+# diff for MemoTrie-0.6.11
+diff --git a/src/Data/MemoTrie.hs b/src/Data/MemoTrie.hs
+index b7c7b09..dc6aa26 100644
+--- a/src/Data/MemoTrie.hs
++++ b/src/Data/MemoTrie.hs
+@@ -601,7 +601,6 @@ instance HasTrie a => Applicative ((:->:) a) where
+   (<*>)  = inTrie2 (<*>)
+ 
+ instance HasTrie a => Monad ((:->:) a) where
+-  return a = trie (return a)
+   u >>= k  = trie (untrie u >>= untrie . k)
+ 
+ -- | Identity trie
+
+
+# diff for midi-0.2.2.4
+diff --git a/src/Sound/MIDI/Monoid.hs b/src/Sound/MIDI/Monoid.hs
+index d016cbe..5d84137 100644
+--- a/src/Sound/MIDI/Monoid.hs
++++ b/src/Sound/MIDI/Monoid.hs
+@@ -12,11 +12,10 @@ infixr 5 +#+
+ (+#+) :: Monoid m => m -> m -> m
+ (+#+) = mappend
+ 
+-
+-genAppend :: (Monoid m) =>
++genAppend :: (Semigroup m) =>
+    (m -> a) -> (a -> m) -> a -> a -> a
+ genAppend cons decons x y =
+-   cons $ mappend (decons x) (decons y)
++   cons $ (<>) (decons x) (decons y)
+ 
+ genConcat :: (Monoid m) =>
+    (m -> a) -> (a -> m) -> [a] -> a
+diff --git a/src/Sound/MIDI/Parser/Restricted.hs b/src/Sound/MIDI/Parser/Restricted.hs
+index 978d8b9..b16d7f4 100644
+--- a/src/Sound/MIDI/Parser/Restricted.hs
++++ b/src/Sound/MIDI/Parser/Restricted.hs
+@@ -49,7 +49,6 @@ instance (Applicative parser, Monad parser) => Applicative (T parser) where
+    Cons f <*> Cons a = Cons $ f <*> a
+ 
+ instance Monad parser => Monad (T parser) where
+-   return = Cons . return
+    x >>= y = Cons $ decons . y =<< decons x
+ 
+ instance Trans.MonadTrans T where
+diff --git a/src/Sound/MIDI/Writer/Basic.hs b/src/Sound/MIDI/Writer/Basic.hs
+index 69bc0ca..6734701 100644
+--- a/src/Sound/MIDI/Writer/Basic.hs
++++ b/src/Sound/MIDI/Writer/Basic.hs
+@@ -81,7 +81,6 @@ instance Semigroup ByteString where
+ 
+ instance Monoid ByteString where
+    mempty = ByteString $ mempty
+-   mappend = (<>)
+    mconcat = genConcat ByteString unByteString
+ 
+ instance C ByteString where
+@@ -109,7 +108,6 @@ instance Semigroup SeekableFile where
+ 
+ instance Monoid SeekableFile where
+    mempty = SeekableFile $ return ()
+-   mappend = (<>)
+    mconcat = SeekableFile . mapM_ unSeekableFile
+ 
+ instance C SeekableFile where
+diff --git a/src/Sound/MIDI/Writer/Status.hs b/src/Sound/MIDI/Writer/Status.hs
+index 044c2df..044f924 100644
+--- a/src/Sound/MIDI/Writer/Status.hs
++++ b/src/Sound/MIDI/Writer/Status.hs
+@@ -28,12 +28,11 @@ newtype T compress writer = Cons {decons :: State.T compress writer}
+ 
+ 
+ instance Semigroup writer => Semigroup (T compress writer) where
+-   Cons x <> Cons y = Cons $ x<>y
++   (<>) = genAppend Cons decons
+    sconcat = nonEmptyConcat Cons decons
+ 
+ instance Monoid writer => Monoid (T compress writer) where
+    mempty = Cons $ mempty
+-   mappend = genAppend Cons decons
+    mconcat = genConcat Cons decons
+ 
+ 
+
+
+# diff for monad-chronicle-1.1.0.1
+diff --git a/src/Control/Monad/Trans/Chronicle.hs b/src/Control/Monad/Trans/Chronicle.hs
+index 2fde4e6..fa1fe21 100644
+--- a/src/Control/Monad/Trans/Chronicle.hs
++++ b/src/Control/Monad/Trans/Chronicle.hs
+@@ -79,7 +79,6 @@ instance (Semigroup c, Applicative m) => Applicative (ChronicleT c m) where
+     ChronicleT f <*> ChronicleT x = ChronicleT (liftA2 (<*>) f x)
+ 
+ instance (Semigroup c, Monad m) => Monad (ChronicleT c m) where
+-    return = ChronicleT . return . return
+     m >>= k = ChronicleT $
+         do cx <- runChronicleT m
+            case cx of
+
+
+# diff for monad-resumption-0.1.4.0
+diff --git a/Control/Monad/Resumption.hs b/Control/Monad/Resumption.hs
+index 46d6902..39fbb7c 100644
+--- a/Control/Monad/Resumption.hs
++++ b/Control/Monad/Resumption.hs
+@@ -22,7 +22,6 @@ runResT (ResT m)  = do
+                         Right m  -> runResT m
+ 
+ instance Monad m => Monad (ResT m) where
+-  return x = ResT $ return $ Left x
+   ResT m >>= f =  ResT $ do 
+                           x <- m 
+                           case x of
+@@ -41,7 +40,7 @@ instance Monad m => Functor (ResT m) where
+                                 Right res -> return $ Right $ res >>= return . f
+ 
+ instance Monad m => Applicative (ResT m) where
+-  pure = return
++  pure x = ResT $ return $ Left x
+   (<*>) = ap
+                               
+ instance MonadIO m => MonadIO (ResT m) where
+diff --git a/Control/Monad/Resumption/Reactive.hs b/Control/Monad/Resumption/Reactive.hs
+index 6d6fbbe..283ebeb 100644
+--- a/Control/Monad/Resumption/Reactive.hs
++++ b/Control/Monad/Resumption/Reactive.hs
+@@ -16,7 +16,6 @@ newtype ReacT input output m a =
+         ReacT { deReacT :: m (Either a (output, input -> ReacT input output m a)) }
+ 
+ instance Monad m => Monad (ReacT input output m) where
+-  return = ReacT . return . Left
+   ReacT comp >>= f = ReacT $ do
+                                 inner <- comp
+                                 case inner of
+@@ -35,7 +34,7 @@ instance Monad m => Functor (ReacT input output m) where
+                                            Right (o,k) -> return (Right (o,\ i -> fmap f (k i))))
+ 
+ instance Monad m => Applicative (ReacT input output m) where
+-  pure  = return
++  pure = ReacT . return . Left
+   (<*>) = ap
+ 
+ instance MonadIO m => MonadIO (ReacT input output m) where
+
+
+# diff for monad-unlift-ref-0.2.1
+diff --git a/Control/Monad/Trans/RWS/Ref.hs b/Control/Monad/Trans/RWS/Ref.hs
+index 87bfc65..d482956 100644
+--- a/Control/Monad/Trans/RWS/Ref.hs
++++ b/Control/Monad/Trans/RWS/Ref.hs
+@@ -113,8 +113,6 @@ instance Applicative m => Applicative (RWSRefT refw refs r w s m) where
+     RWSRefT f <*> RWSRefT g = RWSRefT $ \x y z -> f x y z <*> g x y z
+     {-# INLINE (<*>) #-}
+ instance Monad m => Monad (RWSRefT refw refs r w s m) where
+-    return m = RWSRefT $ \_ _ _ -> return m
+-    {-# INLINE return #-}
+     RWSRefT f >>= g = RWSRefT $ \x y z -> do
+         a <- f x y z
+         unRWSRefT (g a) x y z
+diff --git a/Control/Monad/Trans/State/Ref.hs b/Control/Monad/Trans/State/Ref.hs
+index ff3eb46..32fb819 100644
+--- a/Control/Monad/Trans/State/Ref.hs
++++ b/Control/Monad/Trans/State/Ref.hs
+@@ -98,8 +98,6 @@ instance Applicative m => Applicative (StateRefT ref s m) where
+     StateRefT f <*> StateRefT g = StateRefT $ \x -> f x <*> g x
+     {-# INLINE (<*>) #-}
+ instance Monad m => Monad (StateRefT ref s m) where
+-    return = StateRefT . const . return
+-    {-# INLINE return #-}
+     StateRefT f >>= g = StateRefT $ \x -> do
+         a <- f x
+         unStateRefT (g a) x
+diff --git a/Control/Monad/Trans/Writer/Ref.hs b/Control/Monad/Trans/Writer/Ref.hs
+index 17ee5be..13d424e 100644
+--- a/Control/Monad/Trans/Writer/Ref.hs
++++ b/Control/Monad/Trans/Writer/Ref.hs
+@@ -104,8 +104,6 @@ instance Applicative m => Applicative (WriterRefT ref w m) where
+     WriterRefT f <*> WriterRefT g = WriterRefT $ \x -> f x <*> g x
+     {-# INLINE (<*>) #-}
+ instance Monad m => Monad (WriterRefT ref w m) where
+-    return = WriterRefT . const . return
+-    {-# INLINE return #-}
+     WriterRefT f >>= g = WriterRefT $ \x -> do
+         a <- f x
+         unWriterRefT (g a) x
+
+
+# diff for monoid-transformer-0.0.4
+diff --git a/src/Data/Monoid/Applicative.hs b/src/Data/Monoid/Applicative.hs
+index 106e74b..2497863 100644
+--- a/src/Data/Monoid/Applicative.hs
++++ b/src/Data/Monoid/Applicative.hs
+@@ -17,8 +17,6 @@ instance (Applicative f, Semigroup a) => Semigroup (T f a) where
+ 
+ instance (Applicative f, Monoid a) => Monoid (T f a) where
+    mempty = Cons $ pure mempty
+-   mappend (Cons x) (Cons y) =
+-      Cons $ liftA2 mappend x y
+ 
+ instance (Applicative f) => MonoidTrans.C (T f) where
+    lift = Cons . pure
+diff --git a/src/Data/Monoid/Monad.hs b/src/Data/Monoid/Monad.hs
+index c21bc60..ca5249f 100644
+--- a/src/Data/Monoid/Monad.hs
++++ b/src/Data/Monoid/Monad.hs
+@@ -19,8 +19,6 @@ instance (Monad m, Semigroup a) => Semigroup (T m a) where
+ 
+ instance (Monad m, Monoid a) => Monoid (T m a) where
+    mempty = Cons $ return mempty
+-   mappend (Cons x) (Cons y) =
+-      Cons $ liftM2 mappend x y
+ 
+ instance (Monad m) => MonoidTrans.C (T m) where
+    lift = Cons . return
+diff --git a/src/Data/Monoid/Reader.hs b/src/Data/Monoid/Reader.hs
+index 7ae2d2b..2fa59ff 100644
+--- a/src/Data/Monoid/Reader.hs
++++ b/src/Data/Monoid/Reader.hs
+@@ -22,8 +22,6 @@ instance Semigroup a => Semigroup (T r a) where
+ 
+ instance Monoid a => Monoid (T r a) where
+    mempty = MonoidTrans.lift mempty
+-   mappend (Cons x) (Cons y) =
+-      Cons $ \r -> mappend (x r) (y r)
+ 
+ instance MonoidTrans.C (T r) where
+    lift = Cons . const
+diff --git a/src/Data/Monoid/State.hs b/src/Data/Monoid/State.hs
+index 49e70a6..f8557ee 100644
+--- a/src/Data/Monoid/State.hs
++++ b/src/Data/Monoid/State.hs
+@@ -49,11 +49,6 @@ instance Semigroup a => Semigroup (T s a) where
+ 
+ instance Monoid a => Monoid (T s a) where
+    mempty = MonoidTrans.lift mempty
+-   mappend (Cons x) (Cons y) =
+-      Cons $ \s0 ->
+-         let (xr,s1) = x s0
+-             (yr,s2) = y s1
+-         in  (mappend xr yr, s2)
+ 
+ instance MonoidTrans.C (T s) where
+    lift x = Cons $ (,) x
+
+
+# diff for multiset-0.3.4.3
+diff --git a/Data/IntMultiSet.hs b/Data/IntMultiSet.hs
+index eba17d3..2e34aaa 100644
+--- a/Data/IntMultiSet.hs
++++ b/Data/IntMultiSet.hs
+@@ -194,7 +194,9 @@ type Occur = Int
+ 
+ instance Monoid IntMultiSet where
+     mempty  = empty
++#if !MIN_VERSION_base(4,9,0)
+     mappend = union
++#endif
+     mconcat = unions
+ 
+ #if MIN_VERSION_base(4,9,0)
+diff --git a/Data/MultiSet.hs b/Data/MultiSet.hs
+index 7659df5..1418fc5 100644
+--- a/Data/MultiSet.hs
++++ b/Data/MultiSet.hs
+@@ -198,7 +198,9 @@ type Occur = Int
+ 
+ instance Ord a => Monoid (MultiSet a) where
+     mempty  = empty
++#if !MIN_VERSION_base(4,9,0)
+     mappend = union
++#endif
+     mconcat = unions
+ 
+ #if MIN_VERSION_base(4,9,0)
+
+
+# diff for netwire-5.0.3
+diff --git a/Control/Wire/Core.hs b/Control/Wire/Core.hs
+index f141761..ee77009 100644
+--- a/Control/Wire/Core.hs
++++ b/Control/Wire/Core.hs
+@@ -217,7 +217,6 @@ instance (Monad m, IsString b) => IsString (Wire s e m a b) where
+ 
+ instance (Monad m, Monoid b) => Monoid (Wire s e m a b) where
+     mempty = pure mempty
+-    mappend = liftA2 mappend
+ 
+ instance (Monad m, Num b) => Num (Wire s e m a b) where
+     (+) = liftA2 (+)
+
+
+# diff for non-empty-0.3.5
+diff --git a/src/Data/NonEmptyPrivate.hs b/src/Data/NonEmptyPrivate.hs
+index f0e4336..e494b62 100644
+--- a/src/Data/NonEmptyPrivate.hs
++++ b/src/Data/NonEmptyPrivate.hs
+@@ -149,7 +149,6 @@ instance
+ 
+ instance (Monad f, C.Empty f, C.Cons f, C.Append f) =>
+       Monad (T f) where
+-   return = singleton
+    (>>=) = bind
+ 
+ 
+
+
+# diff for non-empty-sequence-0.2.0.4
+diff --git a/lib/Data/Sequence/NonEmpty.hs b/lib/Data/Sequence/NonEmpty.hs
+index 91fec4d..9c9ed76 100644
+--- a/lib/Data/Sequence/NonEmpty.hs
++++ b/lib/Data/Sequence/NonEmpty.hs
+@@ -30,7 +30,6 @@ instance Semigroup (NonEmptySeq a) where
+     = NonEmptySeq a1 (as <> (b1 <| bs))
+ 
+ instance Monad NonEmptySeq where
+-  return a = NonEmptySeq a Seq.empty
+   NonEmptySeq a as >>= f = NonEmptySeq (_fore r1) rs
+     where
+       r1 = f a
+@@ -38,7 +37,7 @@ instance Monad NonEmptySeq where
+       rss = join . fmap nonEmptySeqToSeq . fmap f $ as
+ 
+ instance Applicative NonEmptySeq where
+-  pure = return
++  pure a = NonEmptySeq a Seq.empty
+   (<*>) = ap
+ 
+ -- | Flattens a 'NonEmptySeq' to a 'Seq'.
+
+
+# diff for non-negative-0.1.2
+diff --git a/src/Numeric/NonNegative/ChunkyPrivate.hs b/src/Numeric/NonNegative/ChunkyPrivate.hs
+index 7c00f2b..04543f1 100644
+--- a/src/Numeric/NonNegative/ChunkyPrivate.hs
++++ b/src/Numeric/NonNegative/ChunkyPrivate.hs
+@@ -199,7 +199,6 @@ instance Semigroup (T a) where
+ 
+ instance Monoid (T a) where
+    mempty = zero
+-   mappend = lift2 (++)
+ 
+ instance (NonNeg.C a, Arbitrary a) => Arbitrary (T a) where
+    arbitrary = liftM Cons arbitrary
+diff --git a/src/Numeric/NonNegative/Wrapper.hs b/src/Numeric/NonNegative/Wrapper.hs
+index 1be075b..d85b4e8 100644
+--- a/src/Numeric/NonNegative/Wrapper.hs
++++ b/src/Numeric/NonNegative/Wrapper.hs
+@@ -112,7 +112,6 @@ instance (Num a) => Semigroup (T a) where
+ 
+ instance (Num a) => Monoid (T a) where
+    mempty = Cons 0
+-   mappend (Cons x) (Cons y) = Cons (x+y)
+    mconcat = Cons . sum . map toNumber
+ 
+ instance (Ord a, Num a) => NonNeg.C (T a) where
+
+
+# diff for nondeterminism-1.5
+diff --git a/src/Control/Monad/Amb.hs b/src/Control/Monad/Amb.hs
+index f702583..421954f 100644
+--- a/src/Control/Monad/Amb.hs
++++ b/src/Control/Monad/Amb.hs
+@@ -106,7 +106,6 @@ instance MonadTrans (AmbT r) where
+ 
+ instance Monad (AmbT r m) where
+     AmbT a >>= b = AmbT $ a >>= unAmbT . b
+-    return = AmbT . return
+ 
+ instance MonadPlus (AmbT r m) where
+   mzero = fail'
+@@ -116,7 +115,7 @@ instance Functor (AmbT r m) where
+   fmap = liftM
+ 
+ instance Applicative (AmbT r m) where
+-  pure = return
++  pure = AmbT . return
+   (<*>) = ap
+ 
+ instance Alternative (AmbT r m) where
+
+
+# diff for optional-args-1.0.2
+diff --git a/src/Data/Optional.hs b/src/Data/Optional.hs
+index b97bbb0..0def862 100644
+--- a/src/Data/Optional.hs
++++ b/src/Data/Optional.hs
+@@ -112,7 +112,6 @@ instance Applicative Optional where
+     _          <*> _          = Default
+ 
+ instance Monad Optional where
+-    return = Specific
+ 
+     Default    >>= _ = Default
+     Specific x >>= f = f x
+
+
+# diff for partial-handler-1.0.3
+diff --git a/library/PartialHandler.hs b/library/PartialHandler.hs
+index 3ef4989..9d63f8c 100644
+--- a/library/PartialHandler.hs
++++ b/library/PartialHandler.hs
+@@ -40,8 +40,6 @@ instance Sem.Semigroup (PartialHandler a) where
+ instance Monoid (PartialHandler a) where
+   mempty = 
+     empty
+-  mappend =
+-    (<|>)
+ 
+ 
+ 
+
+
+# diff for pathtype-0.8.1.3
+diff --git a/src/System/Path/Internal.hs b/src/System/Path/Internal.hs
+index 272f506..633a765 100644
+--- a/src/System/Path/Internal.hs
++++ b/src/System/Path/Internal.hs
+@@ -999,7 +999,6 @@ instance (Class.Rel ar, Class.Dir fd) => Semigroup (Path os ar fd) where
+ 
+ instance (Class.Rel ar, Class.Dir fd) => Monoid (Path os ar fd) where
+     mempty = Path Class.relVar [] Class.dirVar
+-    mappend (Path r pcs0 _dir) (Path _rel pcs1 d) = Path r (pcs0 ++ pcs1) d
+     mconcat paths =
+         Path Class.relVar
+             (concatMap (\(Path _rel pcs _dir) -> pcs) paths) Class.dirVar
+
+
+# diff for persistable-record-0.6.0.6
+diff --git a/src/Database/Record/FromSql.hs b/src/Database/Record/FromSql.hs
+index 34dbf10..3a02684 100644
+--- a/src/Database/Record/FromSql.hs
++++ b/src/Database/Record/FromSql.hs
+@@ -93,7 +93,6 @@ runToRecord r = fst . runTakeRecord r
+ 
+ -- | 'Monad' instance like parser 'Monad'.
+ instance Monad (RecordFromSql q) where
+-  return a = createRecordFromSql ((,) a)
+   ma >>= fmb =
+     createRecordFromSql
+     (\vals -> let (a, vals') = runTakeRecord ma vals
+@@ -105,7 +104,7 @@ instance Functor (RecordFromSql q) where
+ 
+ -- | Derived 'Applicative' instance from 'Monad' instance
+ instance Applicative (RecordFromSql q) where
+-  pure  = return
++  pure a = createRecordFromSql ((,) a)
+   (<*>) = ap
+ 
+ -- | Derivation rule of 'RecordFromSql' parser function object for Haskell tuple (,) type.
+
+
+# diff for pipes-concurrency-2.0.14
+diff --git a/src/Pipes/Concurrent.hs b/src/Pipes/Concurrent.hs
+index a0f589f..55b4fa5 100644
+--- a/src/Pipes/Concurrent.hs
++++ b/src/Pipes/Concurrent.hs
+@@ -71,7 +71,6 @@ instance Applicative Input where
+     mf <*> mx = Input ((<*>) <$> recv mf <*> recv mx)
+ 
+ instance Monad Input where
+-    return r = Input (return (return r))
+     m >>= f  = Input $ do
+         ma <- recv m
+         case ma of
+
+
+# diff for pipes-fluid-0.6.0.1
+diff --git a/src/Pipes/Fluid/Impulse.hs b/src/Pipes/Fluid/Impulse.hs
+index f51d623..66640c0 100644
+--- a/src/Pipes/Fluid/Impulse.hs
++++ b/src/Pipes/Fluid/Impulse.hs
+@@ -35,7 +35,6 @@ instance  (Alternative m, Monad m, Semigroup a) => Semigroup (Impulse m a) where
+ 
+ instance  (Alternative m, Monad m, Semigroup a) => Monoid (Impulse m a) where
+     mempty = Impulse $ pure ()
+-    mappend = mergeDiscrete
+ 
+ instance Monad m =>
+          Functor (Impulse m) where
+diff --git a/src/Pipes/Fluid/ImpulseIO.hs b/src/Pipes/Fluid/ImpulseIO.hs
+index 09921a4..0dc1f76 100644
+--- a/src/Pipes/Fluid/ImpulseIO.hs
++++ b/src/Pipes/Fluid/ImpulseIO.hs
+@@ -45,7 +45,6 @@ instance  (MonadBaseControl IO m, Forall (A.Pure m), Semigroup a) => Semigroup (
+ 
+ instance  (MonadBaseControl IO m, Forall (A.Pure m), Semigroup a) => Monoid (ImpulseIO m a) where
+     mempty = ImpulseIO $ pure ()
+-    mappend = mergeDiscrete
+ 
+ instance Monad m => Functor (ImpulseIO m) where
+   fmap f (ImpulseIO as) = ImpulseIO $ as P.>-> PP.map f
+
+
+# diff for plaid-0.1.0.4
+diff --git a/Data/Api/Types.hs b/Data/Api/Types.hs
+index 9739af8..f7e6f70 100644
+--- a/Data/Api/Types.hs
++++ b/Data/Api/Types.hs
+@@ -739,7 +739,6 @@ instance Monoid PlaidOptions where
+       , _plaidOptionsOverrideUsername = ""
+       , _plaidOptionsOverridePassword = ""
+       }
+-  mappend _ b = b
+ 
+ instance Semigroup (PlaidBody a) where
+   (<>) _ b = b
+@@ -765,5 +764,4 @@ instance Monoid (PlaidBody a) where
+         , _plaidBodyStartDate         = Nothing
+         , _plaidBodyEndDate           = Nothing
+         }
+-  mappend _ b = b
+ 
+
+
+# diff for pooled-io-0.0.2.3
+diff --git a/src/Control/Concurrent/PooledIO/InOrder.hs b/src/Control/Concurrent/PooledIO/InOrder.hs
+index ea1b3d3..64a8740 100644
+--- a/src/Control/Concurrent/PooledIO/InOrder.hs
++++ b/src/Control/Concurrent/PooledIO/InOrder.hs
+@@ -21,7 +21,6 @@ instance Applicative T where
+    Cons f <*> Cons a = Cons $ f <*> a
+ 
+ instance Monad T where
+-   return = Cons . return
+    Cons x >>= k  =  Cons $ decons . k =<< x
+ 
+ {-
+
+
+# diff for probability-0.2.8
+diff --git a/src/Numeric/Probability/Distribution.hs b/src/Numeric/Probability/Distribution.hs
+index c113d13..5b6bf87 100644
+--- a/src/Numeric/Probability/Distribution.hs
++++ b/src/Numeric/Probability/Distribution.hs
+@@ -63,7 +63,6 @@ certainly :: Num prob => a -> T prob a
+ certainly x = Cons [(x,1)]
+ 
+ instance Num prob => Monad (T prob) where
+-  return   = certainly
+   d >>= f  = Cons [(y,q*p) | (x,p) <- decons d, (y,q) <- decons (f x)]
+ 
+ instance Num prob => Applicative (T prob) where
+diff --git a/src/Numeric/Probability/Random.hs b/src/Numeric/Probability/Random.hs
+index 8ea6bb6..87188b4 100644
+--- a/src/Numeric/Probability/Random.hs
++++ b/src/Numeric/Probability/Random.hs
+@@ -20,7 +20,6 @@ import Prelude hiding (print)
+ newtype T a = Cons {decons :: State Random.StdGen a}
+ 
+ instance Monad T where
+-   return x = Cons (return x)
+    Cons x >>= y =
+       Cons (decons . y =<< x)
+ 
+
+
+# diff for promises-0.3
+diff --git a/src/Data/Promise.hs b/src/Data/Promise.hs
+index e4bd643..3dcd46a 100644
+--- a/src/Data/Promise.hs
++++ b/src/Data/Promise.hs
+@@ -70,11 +70,10 @@ instance Functor (Lazy s) where
+     go (Fulfilled v k) = Fulfilled v (fmap (fmap f) k)
+ 
+ instance Applicative (Lazy s) where
+-  pure = return
++  pure a = Lazy $ \_ -> return $ Pure a
+   (<*>) = ap
+ 
+ instance Monad (Lazy s) where
+-  return a = Lazy $ \_ -> return $ Pure a
+   m >>= f = Lazy $ \mv -> let
+       go (Pure a) = getLazy (f a) mv
+       go (Fulfilled v k) = return $ Fulfilled v (k >>= go)
+
+
+# diff for quickcheck-classes-base-0.6.2.0
+diff --git a/src/Test/QuickCheck/Classes/Generic.hs b/src/Test/QuickCheck/Classes/Generic.hs
+index bea09df..add0965 100644
+--- a/src/Test/QuickCheck/Classes/Generic.hs
++++ b/src/Test/QuickCheck/Classes/Generic.hs
+@@ -89,7 +89,6 @@ instance (Applicative f, Semigroup a) => Semigroup (GApply f a) where
+ 
+ instance (Applicative f, Monoid a) => Monoid (GApply f a) where
+   mempty = GApply $ pure mempty
+-  mappend (GApply x) (GApply y) = GApply $ liftA2 (MD.<>) x y
+ 
+ instance (Eq1 f, Eq a) => Eq (GApply f a) where
+   GApply a == GApply b = eq1 a b
+
+
+# diff for quickcheck-transformer-0.3.1.2
+diff --git a/src-fail/before-4.13/Test/QuickCheck/GenT/Private.hs b/src-fail/before-4.13/Test/QuickCheck/GenT/Private.hs
+index ec03b38..f4dc392 100644
+--- a/src-fail/before-4.13/Test/QuickCheck/GenT/Private.hs
++++ b/src-fail/before-4.13/Test/QuickCheck/GenT/Private.hs
+@@ -15,7 +15,6 @@ instance (Functor m) => Functor (GenT m) where
+   fmap f m = GenT $ \r n -> fmap f $ unGenT m r n
+ 
+ instance (Monad m) => Monad (GenT m) where
+-  return a = GenT (\_ _ -> return a)
+   m >>= k = GenT $ \r n -> do
+     let (r1, r2) = Random.split r
+     a <- unGenT m r1 n
+@@ -23,7 +22,7 @@ instance (Monad m) => Monad (GenT m) where
+   fail msg = GenT (\_ _ -> fail msg)
+ 
+ instance (Functor m, Monad m) => Applicative (GenT m) where
+-  pure = return
++  pure a = GenT (\_ _ -> return a)
+   (<*>) = ap
+ 
+ instance MonadTrans GenT where
+diff --git a/src-fail/from-4.13/Test/QuickCheck/GenT/Private.hs b/src-fail/from-4.13/Test/QuickCheck/GenT/Private.hs
+index 90e5669..d12957d 100644
+--- a/src-fail/from-4.13/Test/QuickCheck/GenT/Private.hs
++++ b/src-fail/from-4.13/Test/QuickCheck/GenT/Private.hs
+@@ -14,7 +14,6 @@ instance (Functor m) => Functor (GenT m) where
+   fmap f m = GenT $ \r n -> fmap f $ unGenT m r n
+ 
+ instance (Monad m) => Monad (GenT m) where
+-  return a = GenT (\_ _ -> return a)
+   m >>= k = GenT $ \r n -> do
+     let (r1, r2) = Random.split r
+     a <- unGenT m r1 n
+@@ -24,7 +23,7 @@ instance (MonadFail m) => MonadFail (GenT m) where
+   fail msg = GenT (\_ _ -> fail msg)
+ 
+ instance (Functor m, Monad m) => Applicative (GenT m) where
+-  pure = return
++  pure a = GenT (\_ _ -> return a)
+   (<*>) = ap
+ 
+ instance MonadTrans GenT where
+
+
+# diff for range-set-list-0.1.4.1
+diff --git a/src/Data/RangeSet/IntMap.hs b/src/Data/RangeSet/IntMap.hs
+index 7578129..b6e3572 100644
+--- a/src/Data/RangeSet/IntMap.hs
++++ b/src/Data/RangeSet/IntMap.hs
+@@ -98,7 +98,6 @@ instance Semigroup RIntSet where
+ 
+ instance Monoid RIntSet where
+   mempty  = empty
+-  mappend = union
+ 
+ instance NFData RIntSet where
+   rnf (RSet xs) = rnf xs
+diff --git a/src/Data/RangeSet/List.hs b/src/Data/RangeSet/List.hs
+index 63da48b..945f341 100644
+--- a/src/Data/RangeSet/List.hs
++++ b/src/Data/RangeSet/List.hs
+@@ -120,7 +120,6 @@ instance (Ord a, Enum a) => Semigroup (RSet a) where
+ 
+ instance (Ord a, Enum a) => Monoid (RSet a) where
+     mempty  = empty
+-    mappend = union
+ 
+ instance Hashable a => Hashable (RSet a) where
+     hashWithSalt salt (RSet xs) = hashWithSalt salt xs
+diff --git a/src/Data/RangeSet/Map.hs b/src/Data/RangeSet/Map.hs
+index 41dc280..1811a32 100644
+--- a/src/Data/RangeSet/Map.hs
++++ b/src/Data/RangeSet/Map.hs
+@@ -117,7 +117,6 @@ instance (Ord a, Enum a) => Semigroup (RSet a) where
+ 
+ instance (Ord a, Enum a) => Monoid (RSet a) where
+   mempty  = empty
+-  mappend = union
+ 
+ instance NFData a => NFData (RSet a) where
+   rnf (RSet xs) = rnf xs
+
+
+# diff for reactive-midyim-0.4.1.1
+diff --git a/src/Reactive/Banana/MIDI/Time.hs b/src/Reactive/Banana/MIDI/Time.hs
+index 1f634ed..b5f3dd3 100644
+--- a/src/Reactive/Banana/MIDI/Time.hs
++++ b/src/Reactive/Banana/MIDI/Time.hs
+@@ -62,14 +62,12 @@ instance Semigroup Seconds where
+ 
+ instance Monoid Seconds where
+    mempty = Seconds 0
+-   mappend = (<>)
+ 
+ instance Semigroup Ticks where
+    Ticks x <> Ticks y = Ticks $ x+y
+ 
+ instance Monoid Ticks where
+    mempty = Ticks 0
+-   mappend = (<>)
+ 
+ 
+ instance (Semigroup a) => Semigroup (T m t a) where
+@@ -77,7 +75,6 @@ instance (Semigroup a) => Semigroup (T m t a) where
+ 
+ instance (Monoid a) => Monoid (T m t a) where
+    mempty = cons mempty
+-   mappend x y = cons $ mappend (decons x) (decons y)
+ 
+ 
+ class RelativeC t where
+
+
+# diff for reform-0.2.7.6
+diff --git a/Text/Reform/Result.hs b/Text/Reform/Result.hs
+index 32eca75..2485d47 100644
+--- a/Text/Reform/Result.hs
++++ b/Text/Reform/Result.hs
+@@ -31,7 +31,6 @@ instance Functor (Result e) where
+     fmap f (Ok x)    = Ok (f x)
+ 
+ instance Monad (Result e) where
+-    return = Ok
+     Error x >>= _ = Error x
+     Ok x    >>= f = f x
+ 
+
+
+# diff for regex-applicative-0.3.4
+diff --git a/Text/Regex/Applicative/Reference.hs b/Text/Regex/Applicative/Reference.hs
+index 6a6a530..80f4c26 100644
+--- a/Text/Regex/Applicative/Reference.hs
++++ b/Text/Regex/Applicative/Reference.hs
+@@ -24,7 +24,6 @@ import Control.Monad
+ newtype P s a = P { unP :: [s] -> [(a, [s])] }
+ 
+ instance Monad (P s) where
+-    return x = P $ \s -> [(x, s)]
+     (P a) >>= k = P $ \s ->
+         a s >>= \(x,s) -> unP (k x) s
+ 
+@@ -33,7 +32,7 @@ instance Functor (P s) where
+ 
+ instance Applicative (P s) where
+     (<*>) = ap
+-    pure = return
++    pure x = P $ \s -> [(x, s)]
+ 
+ instance Alternative (P s) where
+     empty = P $ const []
+
+
+# diff for rest-rewrite-0.4.5
+diff --git a/src/Language/REST/Internal/ListT.hs b/src/Language/REST/Internal/ListT.hs
+index 2a08968..27144b8 100644
+--- a/src/Language/REST/Internal/ListT.hs
++++ b/src/Language/REST/Internal/ListT.hs
+@@ -23,7 +23,6 @@ instance (Monad m) => Applicative (ListT m) where
+       map f xs
+ 
+ instance (Monad m) => Monad (ListT m) where
+-  return x         = ListT (return [x])
+   (ListT mxs) >>= f = ListT $ do
+     xs <- mxs
+     res <- mapM (runListT . f) xs
+
+
+# diff for rio-0.1.24.0
+diff --git a/src/RIO/Prelude/RIO.hs b/src/RIO/Prelude/RIO.hs
+index b670a62..89338a3 100644
+--- a/src/RIO/Prelude/RIO.hs
++++ b/src/RIO/Prelude/RIO.hs
+@@ -42,7 +42,6 @@ instance Semigroup a => Semigroup (RIO env a) where
+   (<>) = liftA2 (<>)
+ instance Monoid a => Monoid (RIO env a) where
+   mempty = pure mempty
+-  mappend = liftA2 mappend
+ 
+ -- | Using the environment run in IO the action that requires that environment.
+ --
+
+
+# diff for safe-decimal-0.2.1.0
+diff --git a/src/Numeric/Decimal/BoundedArithmetic.hs b/src/Numeric/Decimal/BoundedArithmetic.hs
+index ff1bc7b..eea37bb 100644
+--- a/src/Numeric/Decimal/BoundedArithmetic.hs
++++ b/src/Numeric/Decimal/BoundedArithmetic.hs
+@@ -105,8 +105,6 @@ instance Applicative Arith where
+   {-# INLINE (<*>) #-}
+ 
+ instance Monad Arith where
+-  return = Arith
+-  {-# INLINE return #-}
+   (>>=) fa fab =
+     case fa of
+       Arith fr -> fab fr
+
+
+# diff for scanner-0.3.1
+diff --git a/lib/Scanner/Internal.hs b/lib/Scanner/Internal.hs
+index b2fb829..dad5885 100644
+--- a/lib/Scanner/Internal.hs
++++ b/lib/Scanner/Internal.hs
+@@ -46,7 +46,8 @@ instance Functor Scanner where
+ 
+ instance Applicative Scanner where
+   {-# INLINE pure #-}
+-  pure = return
++  pure a = Scanner $ \bs next ->
++    next bs a
+   {-# INLINE (<*>) #-}
+   (<*>) = ap
+ 
+@@ -57,10 +58,6 @@ instance Applicative Scanner where
+   s1 <* s2 = s1 >>= \a -> s2 >> return a
+ 
+ instance Monad Scanner where
+-  {-# INLINE return #-}
+-  return a = Scanner $ \bs next ->
+-    next bs a
+-
+   {-# INLINE (>>=) #-}
+   s1 >>= s2 = Scanner $ \bs next ->
+     run s1 bs $ \bs' a ->
+
+
+# diff for servant-docs-0.13.1
+diff --git a/cabal.project b/cabal.project
+new file mode 100644
+index 0000000..e6fdbad
+--- /dev/null
++++ b/cabal.project
+@@ -0,0 +1 @@
++packages: .
+diff --git a/src/Servant/Docs/Internal.hs b/src/Servant/Docs/Internal.hs
+index eecfc65..c811005 100644
+--- a/src/Servant/Docs/Internal.hs
++++ b/src/Servant/Docs/Internal.hs
+@@ -129,11 +129,11 @@ data API = API
+   } deriving (Eq, Show)
+ 
+ instance Semigroup API where
+-    (<>) = mappend
++    API a1 b1 <> API a2 b2 = API
++      (a1 <> a2)
++      (HM.unionWith combineAction b1 b2)
+ 
+ instance Monoid API where
+-    API a1 b1 `mappend` API a2 b2 = API (a1 `mappend` a2)
+-                                        (HM.unionWith combineAction b1 b2)
+     mempty = API mempty mempty
+ 
+ -- | An empty 'API'
+@@ -208,11 +208,10 @@ data DocNote = DocNote
+ -- Multiple ExtraInfo may be combined with the monoid instance.
+ newtype ExtraInfo api = ExtraInfo (HashMap Endpoint Action)
+ instance Semigroup (ExtraInfo a) where
+-    (<>) = mappend
++    ExtraInfo a <> ExtraInfo b =
++        ExtraInfo $ HM.unionWith combineAction a b
+ instance Monoid (ExtraInfo a) where
+     mempty = ExtraInfo mempty
+-    ExtraInfo a `mappend` ExtraInfo b =
+-        ExtraInfo $ HM.unionWith combineAction a b
+ 
+ -- | Documentation options.
+ data DocOptions = DocOptions
+
+
+# diff for set-cover-0.1.1.1
+diff --git a/src/Math/SetCover/BitMap.hs b/src/Math/SetCover/BitMap.hs
+index 32a3b03..9e24d81 100644
+--- a/src/Math/SetCover/BitMap.hs
++++ b/src/Math/SetCover/BitMap.hs
+@@ -30,7 +30,6 @@ instance (Bit.C bits) => Semigroup (Map bits) where
+ 
+ instance (Bit.C bits) => Monoid (Map bits) where
+    mempty = Map []
+-   mappend = add
+ 
+ 
+ fromSet :: Bit.C bits => Set bits -> Map bits
+
+
+# diff for shell-conduit-5.0.0
+diff --git a/src/Data/Conduit/Shell/Process.hs b/src/Data/Conduit/Shell/Process.hs
+index d352b62..276eb38 100644
+--- a/src/Data/Conduit/Shell/Process.hs
++++ b/src/Data/Conduit/Shell/Process.hs
+@@ -53,7 +53,6 @@ data Segment m r
+   | SegmentProcess (Handles -> m r)
+ 
+ instance MonadIO m => Monad (Segment m) where
+-  return = SegmentConduit . return
+   SegmentConduit c >>= f =
+     SegmentProcess (conduitToProcess c) >>=
+     f
+@@ -70,7 +69,7 @@ instance MonadIO m => Functor (Segment m) where
+   fmap = liftM
+ 
+ instance MonadIO m => Applicative (Segment m) where
+-  (<*>) = ap; pure = return
++  (<*>) = ap; pure = SegmentConduit . return
+ 
+ instance MonadUnliftIO m => Alternative (Segment m) where
+   this <|> that =
+
+
+# diff for socks-0.6.1
+diff --git a/Network/Socks5/Parse.hs b/Network/Socks5/Parse.hs
+index e76299f..ca9f732 100644
+--- a/Network/Socks5/Parse.hs
++++ b/Network/Socks5/Parse.hs
+@@ -72,7 +72,6 @@ newtype Parser a = Parser
+     { runParser :: forall r . ByteString -> Failure r -> Success a r -> Result r }
+ 
+ instance Monad Parser where
+-    return v = Parser $ \buf _ ok -> ok buf v
+     m >>= k = Parser $ \buf err ok ->
+          runParser m buf err (\buf' a -> runParser (k a) buf' err ok)
+ #if MIN_VERSION_base(4,13,0)
+@@ -88,7 +87,7 @@ instance Functor Parser where
+     fmap f p = Parser $ \buf err ok ->
+         runParser p buf err (\b a -> ok b (f a))
+ instance Applicative Parser where
+-    pure      = return
++    pure v = Parser $ \buf _ ok -> ok buf v
+     (<*>) d e = d >>= \b -> e >>= \a -> return (b a)
+ instance Alternative Parser where
+     empty = fail "Parser.Alternative.empty"
+
+
+# diff for sqlite-simple-0.4.19.0
+diff --git a/Database/SQLite/Simple/Ok.hs b/Database/SQLite/Simple/Ok.hs
+index 819c360..ffd83c3 100644
+--- a/Database/SQLite/Simple/Ok.hs
++++ b/Database/SQLite/Simple/Ok.hs
+@@ -73,7 +73,6 @@ instance MonadPlus Ok where
+     mplus = (<|>)
+ 
+ instance Monad Ok where
+-    return = Ok
+ 
+     Errors es >>= _ = Errors es
+     Ok a      >>= f = f a
+
+
+# diff for step-function-0.2.1
+diff --git a/src/Data/Function/Step.hs b/src/Data/Function/Step.hs
+index 0b39b4e..9caab47 100644
+--- a/src/Data/Function/Step.hs
++++ b/src/Data/Function/Step.hs
+@@ -137,7 +137,6 @@ instance Ord k => Applicative (SF k) where
+     (<*>) = ap
+ 
+ instance Ord k => Monad (SF k) where
+-    return = pure
+ 
+     SF m def0 >>= f = SF
+         (Map.fromDistinctAscList $ mkDistinctAscList $ pieces ++ pieces1)
+@@ -164,7 +163,6 @@ instance (Ord k, Semigroup v) => Semigroup (SF k v) where
+ 
+ instance (Ord k, Monoid v) => Monoid (SF k v) where
+     mempty = pure mempty
+-    mappend = liftA2 mappend
+ 
+ instance (Ord k, QC.Arbitrary k, QC.Arbitrary v) => QC.Arbitrary (SF k v) where
+     arbitrary = fromList <$> QC.arbitrary <*> QC.arbitrary
+diff --git a/src/Data/Function/Step/Discrete/Closed.hs b/src/Data/Function/Step/Discrete/Closed.hs
+index bd7ced7..6e2b0a3 100644
+--- a/src/Data/Function/Step/Discrete/Closed.hs
++++ b/src/Data/Function/Step/Discrete/Closed.hs
+@@ -89,7 +89,6 @@ instance Ord k => Applicative (SF k) where
+     (<*>) = ap
+ 
+ instance Ord k => Monad (SF k) where
+-    return = pure
+ 
+     SF m def0 >>= f = SF
+         (Map.fromDistinctAscList $ mkDistinctAscList $ pieces ++ pieces1)
+@@ -116,7 +115,6 @@ instance (Ord k, Semigroup v) => Semigroup (SF k v) where
+ 
+ instance (Ord k, Monoid v) => Monoid (SF k v) where
+     mempty = pure mempty
+-    mappend = liftA2 mappend
+ 
+ instance (Ord k, QC.Arbitrary k, QC.Arbitrary v) => QC.Arbitrary (SF k v) where
+     arbitrary = fromList <$> QC.arbitrary <*> QC.arbitrary
+diff --git a/src/Data/Function/Step/Discrete/Open.hs b/src/Data/Function/Step/Discrete/Open.hs
+index ac71ed7..f8c33fe 100644
+--- a/src/Data/Function/Step/Discrete/Open.hs
++++ b/src/Data/Function/Step/Discrete/Open.hs
+@@ -89,7 +89,6 @@ instance Ord k => Applicative (SF k) where
+     (<*>) = ap
+ 
+ instance Ord k => Monad (SF k) where
+-    return = pure
+ 
+     SF m def0 >>= f = SF
+         (Map.fromDistinctAscList $ mkDistinctAscList $ pieces ++ pieces1)
+@@ -116,7 +115,6 @@ instance (Ord k, Semigroup v) => Semigroup (SF k v) where
+ 
+ instance (Ord k, Monoid v) => Monoid (SF k v) where
+     mempty = pure mempty
+-    mappend = liftA2 mappend
+ 
+ instance (Ord k, QC.Arbitrary k, QC.Arbitrary v) => QC.Arbitrary (SF k v) where
+     arbitrary = fromList <$> QC.arbitrary <*> QC.arbitrary
+
+
+# diff for storablevector-0.2.13.2
+diff --git a/src/Data/StorableVector.hs b/src/Data/StorableVector.hs
+index 6f22a5e..37138a9 100644
+--- a/src/Data/StorableVector.hs
++++ b/src/Data/StorableVector.hs
+@@ -242,7 +242,6 @@ instance (Storable a) => Semigroup (Vector a) where
+ 
+ instance (Storable a) => Monoid (Vector a) where
+     mempty  = empty
+-    mappend = append
+     mconcat = concat
+ 
+ instance (Storable a, QC.Arbitrary a) => QC.Arbitrary (Vector a) where
+diff --git a/src/Data/StorableVector/Lazy.hs b/src/Data/StorableVector/Lazy.hs
+index 97cf2c2..ca91484 100644
+--- a/src/Data/StorableVector/Lazy.hs
++++ b/src/Data/StorableVector/Lazy.hs
+@@ -163,7 +163,6 @@ instance (Storable a) => Semigroup (Vector a) where
+ 
+ instance (Storable a) => Monoid (Vector a) where
+     mempty  = empty
+-    mappend = append
+     mconcat = concat
+ 
+ instance (Storable a, Eq a) => Eq (Vector a) where
+@@ -207,7 +206,6 @@ instance Semigroup ChunkSize where
+ 
+ instance Monoid ChunkSize where
+    mempty = ChunkSize 0
+-   mappend (ChunkSize x) (ChunkSize y) = ChunkSize (x+y)
+    mconcat = ChunkSize . sum . List.map (\(ChunkSize c) -> c)
+ 
+ instance NonNeg.C ChunkSize where
+diff --git a/src/Data/StorableVector/Lazy/Typed.hs b/src/Data/StorableVector/Lazy/Typed.hs
+index de907d2..32e734f 100644
+--- a/src/Data/StorableVector/Lazy/Typed.hs
++++ b/src/Data/StorableVector/Lazy/Typed.hs
+@@ -187,7 +187,6 @@ instance (Size size, Storable a) => Semigroup (Vector size a) where
+ 
+ instance (Size size, Storable a) => Monoid (Vector size a) where
+     mempty  = empty
+-    mappend = append
+     mconcat = concat
+ 
+ instance (Size size, Storable a, Eq a) => Eq (Vector size a) where
+
+
+# diff for stringbuilder-0.5.1
+diff --git a/src/Data/String/Builder.hs b/src/Data/String/Builder.hs
+index 83e756b..e220e07 100644
+--- a/src/Data/String/Builder.hs
++++ b/src/Data/String/Builder.hs
+@@ -31,11 +31,10 @@ data BuilderM a = BuilderM a ShowS
+   deriving Functor
+ 
+ instance Applicative BuilderM where
+-  pure = return
++  pure a            = BuilderM a id
+   (<*>) = ap
+ 
+ instance Monad BuilderM where
+-  return a            = BuilderM a id
+   BuilderM a xs >>= f = case f a of
+     BuilderM b ys -> BuilderM b (xs . ys)
+ 
+
+
+# diff for swagger2-2.9
+diff --git a/src/Data/Swagger/Declare.hs b/src/Data/Swagger/Declare.hs
+index 49e6361..d0c83a3 100644
+--- a/src/Data/Swagger/Declare.hs
++++ b/src/Data/Swagger/Declare.hs
+@@ -52,7 +52,6 @@ instance (Applicative m, Monad m, Monoid d) => Applicative (DeclareT d m) where
+     return (mappend d' d'', f x)
+ 
+ instance (Applicative m, Monad m, Monoid d) => Monad (DeclareT d m) where
+-  return x = DeclareT (\_ -> pure (mempty, x))
+   DeclareT dx >>= f = DeclareT $ \d -> do
+     ~(d',  x) <- dx d
+     ~(d'', y) <- runDeclareT (f x) (mappend d d')
+
+
+# diff for synthesizer-core-0.8.4
+diff --git a/src/Synthesizer/CausalIO/Process.hs b/src/Synthesizer/CausalIO/Process.hs
+index b5b3b23..a0633b4 100644
+--- a/src/Synthesizer/CausalIO/Process.hs
++++ b/src/Synthesizer/CausalIO/Process.hs
+@@ -208,7 +208,6 @@ instance (CutG.Transform a, CutG.Read b, Monoid b) => Monoid (T a b) where
+       (\ _a () -> return (mempty, ()))
+       (return ())
+       (\() -> return ())
+-   mappend = append mappend
+ 
+ append ::
+    (CutG.Transform a, CutG.Read b) =>
+diff --git a/src/Synthesizer/Generic/LengthSignal.hs b/src/Synthesizer/Generic/LengthSignal.hs
+index 9f5feb1..796a0c0 100644
+--- a/src/Synthesizer/Generic/LengthSignal.hs
++++ b/src/Synthesizer/Generic/LengthSignal.hs
+@@ -41,8 +41,6 @@ instance (Semigroup sig) => Semigroup (T sig) where
+ 
+ instance (Monoid sig) => Monoid (T sig) where
+    mempty = Cons zero mempty
+-   mappend (Cons xl xs) (Cons yl ys) =
+-      Cons (xl+yl) (mappend xs ys)
+ 
+ splitAt :: (CutG.Transform sig) => Int -> T sig -> (T sig, T sig)
+ splitAt n (Cons xl xs) =
+diff --git a/src/Synthesizer/State/Signal.hs b/src/Synthesizer/State/Signal.hs
+index 84b84ad..1c5539c 100644
+--- a/src/Synthesizer/State/Signal.hs
++++ b/src/Synthesizer/State/Signal.hs
+@@ -92,7 +92,6 @@ instance App.Applicative T where
+    x <*> y = liftA2 ($) x y
+ 
+ instance Monad T where
+-   return = singleton
+    x >>= k =
+       runViewL x $ \f s0 ->
+       flip generate (fmap (mapFst k) $ f s0) $ \m ->
+diff --git a/src/Synthesizer/Zip.hs b/src/Synthesizer/Zip.hs
+index 210de6c..a3b561f 100644
+--- a/src/Synthesizer/Zip.hs
++++ b/src/Synthesizer/Zip.hs
+@@ -115,8 +115,6 @@ instance (Semigroup a, Semigroup b) => Semigroup (T a b) where
+ 
+ instance (Monoid a, Monoid b) => Monoid (T a b) where
+    mempty = Cons mempty mempty
+-   mappend (Cons a0 b0) (Cons a1 b1) =
+-      Cons (mappend a0 a1) (mappend b0 b1)
+ 
+ instance (CutG.Read a, CutG.Read b) => CutG.Read (T a b) where
+    {-# INLINE null #-}
+
+
+# diff for synthesizer-dimensional-0.8.1.1
+diff --git a/src/Synthesizer/Dimensional/Process.hs b/src/Synthesizer/Dimensional/Process.hs
+index 61a1d9b..4a9d704 100644
+--- a/src/Synthesizer/Dimensional/Process.hs
++++ b/src/Synthesizer/Dimensional/Process.hs
+@@ -76,7 +76,6 @@ instance Applicative (T s u t) where
+    (<*>) = apply
+ 
+ instance Monad (T s u t) where
+-   return = pure
+    (>>=)  = bind
+ 
+ instance MonadFix (T s u t) where
+diff --git a/src/Synthesizer/Dimensional/Rate/Dirac.hs b/src/Synthesizer/Dimensional/Rate/Dirac.hs
+index 563a033..02a6374 100644
+--- a/src/Synthesizer/Dimensional/Rate/Dirac.hs
++++ b/src/Synthesizer/Dimensional/Rate/Dirac.hs
+@@ -46,7 +46,6 @@ instance Sg.Semigroup (sig Bool) => Sg.Semigroup (T s sig) where
+ 
+ instance Mn.Monoid (sig Bool) => Mn.Monoid (T s sig) where
+    mempty = Cons Mn.mempty
+-   mappend (Cons x) (Cons y) = Cons (Mn.mappend x y)
+ 
+ instance Cut.Read (sig Bool) => Cut.Read (T s sig) where
+    {-# INLINE null #-}
+
+
+# diff for system-filepath-0.4.14.1
+diff --git a/lib/Filesystem/Path.hs b/lib/Filesystem/Path.hs
+index df89efd..938d729 100644
+--- a/lib/Filesystem/Path.hs
++++ b/lib/Filesystem/Path.hs
+@@ -71,7 +71,6 @@ instance Sem.Semigroup FilePath where
+ 
+ instance M.Monoid FilePath where
+   mempty = empty
+-  mappend = append
+   mconcat = concat
+ 
+ -------------------------------------------------------------------------------
+
+
+# diff for tdigest-0.3.1
+diff --git a/src/Data/TDigest/Tree/Internal.hs b/src/Data/TDigest/Tree/Internal.hs
+index 261e4a8..e608415 100644
+--- a/src/Data/TDigest/Tree/Internal.hs
++++ b/src/Data/TDigest/Tree/Internal.hs
+@@ -73,7 +73,6 @@ instance KnownNat comp => Reducer Double (TDigest comp) where
+ 
+ instance  KnownNat comp => Monoid (TDigest comp) where
+     mempty  = emptyTDigest
+-    mappend = combineDigest
+ 
+ -- | 'TDigest' has only strict fields.
+ instance NFData (TDigest comp) where
+
+
+# diff for text-latin1-0.3.1
+diff --git a/src/Text/Ascii.hs b/src/Text/Ascii.hs
+index fe002fc..f086f44 100644
+--- a/src/Text/Ascii.hs
++++ b/src/Text/Ascii.hs
+@@ -170,8 +170,6 @@ instance Semigroup α ⇒ Semigroup (Ascii α) where
+ instance Monoid α ⇒ Monoid (Ascii α) where
+   mempty = trustMe mempty
+   {-# INLINE mempty #-}
+-  mappend x y = trustMe $ mappend (checked x) (checked y)
+-  {-# INLINE mappend #-}
+   mconcat = trustMe . mconcat . fmap checked
+   {-# INLINE mconcat #-}
+ 
+diff --git a/src/Text/Latin1.hs b/src/Text/Latin1.hs
+index 9f90081..5cb1b16 100644
+--- a/src/Text/Latin1.hs
++++ b/src/Text/Latin1.hs
+@@ -98,10 +98,6 @@ instance Semigroup α ⇒ Semigroup (Latin1 α) where
+ instance Monoid α ⇒ Monoid (Latin1 α) where
+   mempty = trustMe mempty
+   {-# INLINE mempty #-}
+-  mappend x y = trustMe $ mappend (checked x) (checked y)
+-  {-# INLINE mappend #-}
+-  mconcat = trustMe . mconcat . fmap checked
+-  {-# INLINE mconcat #-}
+ 
+ instance IsString α ⇒ IsString (Latin1 α) where
+   fromString s | isLatin1 s = trustMe $ fromString s
+
+
+# diff for text-printer-0.5.0.2
+diff --git a/src/Text/Printer.hs b/src/Text/Printer.hs
+index 12b17ef..8dd70bc 100644
+--- a/src/Text/Printer.hs
++++ b/src/Text/Printer.hs
+@@ -452,8 +452,6 @@ instance Semigroup p ⇒ Semigroup (LinePrinter p) where
+ instance Monoid p ⇒ Monoid (LinePrinter p) where
+   mempty = LinePrinter $ const mempty
+   {-# INLINE mempty #-}
+-  mappend x y = LinePrinter $ \l → mappend (linePrinter x l) (linePrinter y l)
+-  {-# INLINE mappend #-}
+   mconcat xs = LinePrinter $ \l → mconcat (map (\x → linePrinter x l) xs)
+   {-# INLINE mconcat #-}
+ 
+diff --git a/tmp_errs.txt b/tmp_errs.txt
+new file mode 100644
+index 0000000..e69de29
+
+
+# diff for text-region-0.3.1.0
+diff --git a/src/Data/Text/Region/Types.hs b/src/Data/Text/Region/Types.hs
+index 55b0e97..7314811 100644
+--- a/src/Data/Text/Region/Types.hs
++++ b/src/Data/Text/Region/Types.hs
+@@ -51,9 +51,6 @@ instance Semigroup Point where
+ 
+ instance Monoid Point where
+ 	mempty = Point 0 0
+-	Point l c `mappend` Point bl bc
+-		| l ≡ 0 = Point bl (c + bc)
+-		| otherwise = Point (l + bl) c
+ 
+ instance Group Point where
+ 	invert (Point l c) = Point (negate l) (negate c)
+@@ -110,7 +107,6 @@ instance Semigroup Map where
+ 
+ instance Monoid Map where
+ 	mempty = Map $ iso id id
+-	Map l `mappend` Map r = Map (r . l)
+ 
+ instance Group Map where
+ 	invert (Map f) = Map (from f)
+
+
+# diff for timespan-0.4.0.0
+diff --git a/src/Data/Time/TimeSpan.hs b/src/Data/Time/TimeSpan.hs
+index 8195e78..e7a16bf 100644
+--- a/src/Data/Time/TimeSpan.hs
++++ b/src/Data/Time/TimeSpan.hs
+@@ -24,12 +24,11 @@ newtype TimeSpan
+   deriving (Show, Eq, Ord)
+ 
+ instance Semigroup TimeSpan where
+-    (<>) = mappend
++    (<>) (TimeSpan a) (TimeSpan b) = TimeSpan (a + b)
+ 
+ -- | An empty `TimeSpan` is 0, and `mappend` is defined as addition
+ instance Monoid TimeSpan where
+     mempty = TimeSpan 0
+-    mappend (TimeSpan a) (TimeSpan b) = TimeSpan (a + b)
+ 
+ milliseconds :: Double -> TimeSpan
+ milliseconds = TimeSpan
+
+
+# diff for unagi-chan-0.4.1.4
+diff --git a/src/Control/Concurrent/Chan/Unagi/NoBlocking/Types.hs b/src/Control/Concurrent/Chan/Unagi/NoBlocking/Types.hs
+index ed70a1e..64de261 100644
+--- a/src/Control/Concurrent/Chan/Unagi/NoBlocking/Types.hs
++++ b/src/Control/Concurrent/Chan/Unagi/NoBlocking/Types.hs
+@@ -48,7 +48,7 @@ instance Functor Element where
+     fmap f = Element . fmap (fmap f) . tryRead
+ 
+ instance  Applicative Element where
+-    pure = return
++    pure = Element . return . return
+     (<*>) = ap
+  
+ instance Alternative Element where
+@@ -56,7 +56,6 @@ instance Alternative Element where
+     (<|>) = mplus
+ 
+ instance Monad Element where
+-    return = Element . return . return
+     x >>= f = Element $ do
+         v <- tryRead x
+         case v of
+
+
+# diff for unexceptionalio-0.5.1
+diff --git a/UnexceptionalIO.hs b/UnexceptionalIO.hs
+index 0d81a07..513f7cd 100644
+--- a/UnexceptionalIO.hs
++++ b/UnexceptionalIO.hs
+@@ -198,11 +198,10 @@ instance Functor UIO where
+ 	fmap = liftM
+ 
+ instance Applicative UIO where
+-	pure = return
++	pure = UIO . return
+ 	(<*>) = ap
+ 
+ instance Monad UIO where
+-	return = UIO . return
+ 	(UIO x) >>= f = UIO (x >>= run . f)
+ #if !MIN_VERSION_base(4,13,0)
+ 	fail s = error $ "UnexceptionalIO cannot fail (" ++ s ++ ")"
+
+
+# diff for unicode-0.0.1.1
+diff --git a/src/Data/Char/Frame.hs b/src/Data/Char/Frame.hs
+index 1768e27..d30380d 100644
+--- a/src/Data/Char/Frame.hs
++++ b/src/Data/Char/Frame.hs
+@@ -17,8 +17,6 @@ instance Semigroup a => Semigroup (Horizontal a) where
+ 
+ instance Monoid a => Monoid (Horizontal a) where
+    mempty = Horizontal mempty mempty
+-   mappend (Horizontal xl xr) (Horizontal yl yr) =
+-      Horizontal (mappend xl yl) (mappend xr yr)
+ 
+ instance Semigroup a => Semigroup (Vertical a) where
+    Vertical xl xr <> Vertical yl yr =
+@@ -26,8 +24,6 @@ instance Semigroup a => Semigroup (Vertical a) where
+ 
+ instance Monoid a => Monoid (Vertical a) where
+    mempty = Vertical mempty mempty
+-   mappend (Vertical xl xr) (Vertical yl yr) =
+-      Vertical (mappend xl yl) (mappend xr yr)
+ 
+ instance Semigroup a => Semigroup (Parts a) where
+    Parts xl xr <> Parts yl yr =
+@@ -35,8 +31,6 @@ instance Semigroup a => Semigroup (Parts a) where
+ 
+ instance Monoid a => Monoid (Parts a) where
+    mempty = Parts mempty mempty
+-   mappend (Parts xl xr) (Parts yl yr) =
+-      Parts (mappend xl yl) (mappend xr yr)
+ 
+ 
+ instance Functor Horizontal where
+
+
+# diff for union-find-array-0.1.0.4
+diff --git a/src/Control/Monad/Union.hs b/src/Control/Monad/Union.hs
+index 65b463e..2f96cc0 100644
+--- a/src/Control/Monad/Union.hs
++++ b/src/Control/Monad/Union.hs
+@@ -40,14 +40,13 @@ newtype UnionM l a = U {
+ }
+ 
+ instance Monad (UnionM l) where
+-    return x =  U (return x)
+     f >>= b = U (runU f >>= \v -> runU (b v))
+ 
+ instance Functor (UnionM l) where
+     fmap = liftM
+ 
+ instance Applicative (UnionM l) where
+-    pure = return
++    pure x =  U (return x)
+     (<*>) = ap
+ 
+ instance MonadFix (UnionM l) where
+
+
+# diff for unique-logic-tf-0.5.1.1
+diff --git a/src/UniqueLogic/ST/TF/Example/Verify.hs b/src/UniqueLogic/ST/TF/Example/Verify.hs
+index 036428d..355e0a4 100644
+--- a/src/UniqueLogic/ST/TF/Example/Verify.hs
++++ b/src/UniqueLogic/ST/TF/Example/Verify.hs
+@@ -71,11 +71,10 @@ instance (Monad m) => Functor (Track m) where
+    fmap = liftM
+ 
+ instance (Monad m) => Applicative (Track m) where
+-   pure = return
++   pure = Track . UMT.point
+    (<*>) = ap
+ 
+ instance (Monad m) => Monad (Track m) where
+-   return = Track . UMT.point
+    x >>= k  =  Track $ UMT.bind (runTrack x) (runTrack . k)
+ 
+ 
+diff --git a/src/UniqueLogic/ST/TF/MonadTrans.hs b/src/UniqueLogic/ST/TF/MonadTrans.hs
+index 3c32903..8d6a0bf 100644
+--- a/src/UniqueLogic/ST/TF/MonadTrans.hs
++++ b/src/UniqueLogic/ST/TF/MonadTrans.hs
+@@ -59,9 +59,8 @@ instance (C t, Monad m) => Functor (Wrap t m) where
+    fmap = liftM
+ 
+ instance (C t, Monad m) => Applicative (Wrap t m) where
+-   pure = return
++   pure = wrap . point
+    (<*>) = ap
+ 
+ instance (C t, Monad m) => Monad (Wrap t m) where
+-   return = wrap . point
+    x >>= k  =  wrap $ bind (unwrap x) (unwrap . k)
+diff --git a/src/UniqueLogic/ST/TF/System.hs b/src/UniqueLogic/ST/TF/System.hs
+index a46d973..250cac4 100644
+--- a/src/UniqueLogic/ST/TF/System.hs
++++ b/src/UniqueLogic/ST/TF/System.hs
+@@ -63,7 +63,6 @@ instance Semigroup (Updates w s) where
+ 
+ instance Monoid (Updates w s) where
+    mempty = Updates Seq.empty
+-   mappend (Updates x) (Updates y) = Updates $ mappend x y
+ 
+ addUpdate :: Update w s -> Updates w s -> Updates w s
+ addUpdate x (Updates xs) = Updates $ xs |> x
+@@ -88,7 +87,6 @@ instance (Ref.C s) => Applicative (T w s) where
+    (<*>) = ap
+ 
+ instance (Ref.C s) => Monad (T w s) where
+-   return = Cons . return
+    Cons x >>= k  = Cons $ run . k =<< x
+ 
+ 
+
+
+# diff for varying-0.8.1.0
+diff --git a/src/Control/Varying/Core.hs b/src/Control/Varying/Core.hs
+index 7ef0855..893fa65 100644
+--- a/src/Control/Varying/Core.hs
++++ b/src/Control/Varying/Core.hs
+@@ -218,7 +218,9 @@ instance (Applicative m, Semigroup b) => Semigroup (VarT m a b) where
+ -- "Hello World!"
+ instance (Applicative m, Monoid b) => Monoid (VarT m a b) where
+   mempty = pure mempty
++#if __GLASGOW_HASKELL__ < 804
+   mappend = liftA2 mappend
++#endif
+ 
+ -- | Vars can be written as numbers.
+ --
+diff --git a/src/Control/Varying/Spline.hs b/src/Control/Varying/Spline.hs
+index 3e13213..6c16e0b 100644
+--- a/src/Control/Varying/Spline.hs
++++ b/src/Control/Varying/Spline.hs
+@@ -90,7 +90,6 @@ instance Monad m => Functor (SplineT a b m) where
+ --
+ -- Note - checkout the <$proofs proofs>
+ instance Monad m => Monad (SplineT a b m) where
+-  return = SplineT . const . return . Left
+   (SplineT s0) >>= f = SplineT $ g s0
+     where g s a = do e <- s a
+                      case e of
+@@ -111,7 +110,7 @@ instance Monad m => Monad (SplineT a b m) where
+ --   return $ f x
+ -- @
+ instance Monad m => Applicative (SplineT a b m) where
+-  pure = return
++  pure = SplineT . const . return . Left
+   sf <*> sx = do
+     f <- sf
+     f <$> sx
+
+
+# diff for vinyl-0.14.3
+diff --git a/Data/Vinyl/Core.hs b/Data/Vinyl/Core.hs
+index f1a2296..3be7390 100644
+--- a/Data/Vinyl/Core.hs
++++ b/Data/Vinyl/Core.hs
+@@ -346,11 +346,9 @@ instance (Semigroup (f r), Semigroup (Rec f rs))
+ 
+ instance Monoid (Rec f '[]) where
+   mempty = RNil
+-  RNil `mappend` RNil = RNil
+ 
+ instance (Monoid (f r), Monoid (Rec f rs)) => Monoid (Rec f (r ': rs)) where
+   mempty = mempty :& mempty
+-  (x :& xs) `mappend` (y :& ys) = (mappend x y) :& (mappend xs ys)
+ 
+ instance Eq (Rec f '[]) where
+   _ == _ = True
+diff --git a/Data/Vinyl/Functor.hs b/Data/Vinyl/Functor.hs
+index 179fd8a..073d091 100644
+--- a/Data/Vinyl/Functor.hs
++++ b/Data/Vinyl/Functor.hs
+@@ -85,7 +85,6 @@ instance Semigroup (f (g a)) => Semigroup (Compose f g a) where
+ 
+ instance Monoid (f (g a)) => Monoid (Compose f g a) where
+   mempty = Compose mempty
+-  mappend (Compose x) (Compose y) = Compose (mappend x y)
+ 
+ -- | Apply a function to a value whose type is the application of the
+ -- 'Compose' type constructor. This works under the 'Compose' newtype
+@@ -134,7 +133,6 @@ instance Semigroup t => Semigroup (ElField '(s,t)) where
+ 
+ instance (KnownSymbol s, Monoid t) => Monoid (ElField '(s,t)) where
+   mempty = Field mempty
+-  mappend (Field x) (Field y) = Field (mappend x y)
+ 
+ instance (Real t, KnownSymbol s) => Real (ElField '(s,t)) where
+   toRational (Field x) = toRational x
+@@ -197,7 +195,6 @@ instance Applicative Identity where
+   Identity f <*> Identity x = Identity (f x)
+ 
+ instance Monad Identity where
+-  return = Identity
+   Identity x >>= f = f x
+ 
+ instance Show a => Show (Identity a) where
+@@ -208,7 +205,6 @@ instance Applicative Thunk where
+   (Thunk f) <*> (Thunk x) = Thunk (f x)
+ 
+ instance Monad Thunk where
+-  return = Thunk
+   (Thunk x) >>= f = f x
+ 
+ instance Show a => Show (Thunk a) where
+
+
+# diff for web-routes-0.27.16
+diff --git a/Web/Routes/RouteT.hs b/Web/Routes/RouteT.hs
+index 189970e..d31650f 100644
+--- a/Web/Routes/RouteT.hs
++++ b/Web/Routes/RouteT.hs
+@@ -90,7 +90,6 @@ instance (Alternative m) => Alternative (RouteT url m) where
+     m <|> n = RouteT $ \ url -> unRouteT m url <|> unRouteT n url
+ 
+ instance (Monad m) => Monad (RouteT url m) where
+-    return   = liftRouteT . return
+     m >>= k  = RouteT $ \ url -> do
+         a <- unRouteT m url
+         unRouteT (k a) url
+
+
+# diff for wl-pprint-annotated-0.1.0.1
+diff --git a/src/Text/PrettyPrint/Annotated/WL.hs b/src/Text/PrettyPrint/Annotated/WL.hs
+index 728d899..74e656d 100644
+--- a/src/Text/PrettyPrint/Annotated/WL.hs
++++ b/src/Text/PrettyPrint/Annotated/WL.hs
+@@ -342,7 +342,6 @@ instance Semigroup (Doc a) where
+   (<>) = Cat
+ 
+ instance Monoid (Doc a) where
+-  mappend = Cat
+   mempty = Empty
+   mconcat = hcat
+ 
+
+
+# diff for wl-pprint-text-1.2.0.2
+diff --git a/Text/PrettyPrint/Leijen/Text.hs b/Text/PrettyPrint/Leijen/Text.hs
+index 060d601..3f94970 100644
+--- a/Text/PrettyPrint/Leijen/Text.hs
++++ b/Text/PrettyPrint/Leijen/Text.hs
+@@ -782,7 +782,9 @@ instance Semigroup Doc where
+ #endif
+ instance Monoid Doc where
+     mempty  = empty
++#if !MIN_VERSION_base (4,9,0)
+     mappend = beside
++#endif
+ 
+ -- | The data type @SimpleDoc@ represents rendered documents and is
+ --   used by the display functions.
+
+
+# diff for xlsx-1.2.0
+diff --git a/src/Codec/Xlsx/Parser/Internal/Fast.hs b/src/Codec/Xlsx/Parser/Internal/Fast.hs
+index 85b3f9c..0bc86fb 100644
+--- a/src/Codec/Xlsx/Parser/Internal/Fast.hs
++++ b/src/Codec/Xlsx/Parser/Internal/Fast.hs
+@@ -153,12 +153,11 @@ newtype AttrParser a = AttrParser
+   }
+ 
+ instance Monad AttrParser where
+-  return a = AttrParser $ \as -> Right (as, a)
+   (AttrParser f) >>= g =
+     AttrParser $ \as ->
+       either Left (\(as', f') -> runAttrParser (g f') as') (f as)
+ instance Applicative AttrParser where
+-    pure = return
++    pure a = AttrParser $ \as -> Right (as, a)
+     (<*>) = ap
+ instance Functor AttrParser where
+   fmap = liftM
+diff --git a/src/Codec/Xlsx/Types/RichText.hs b/src/Codec/Xlsx/Types/RichText.hs
+index 95c7af1..590ea86 100644
+--- a/src/Codec/Xlsx/Types/RichText.hs
++++ b/src/Codec/Xlsx/Types/RichText.hs
+@@ -342,6 +342,7 @@ instance Semigroup RunProperties where
+ -- override earlier ones.
+ instance Monoid RunProperties where
+   mempty = def
++#if !(MIN_VERSION_base(4,11,0))
+   a `mappend` b = RunProperties {
+       _runPropertiesBold          = override _runPropertiesBold
+     , _runPropertiesCharset       = override _runPropertiesCharset
+@@ -362,6 +363,7 @@ instance Monoid RunProperties where
+     where
+       override :: (RunProperties -> Maybe x) -> Maybe x
+       override f = f b `mplus` f a
++#endif
+ 
+ -- | Apply properties to a 'RichTextRun'
+ --
+
+
+# diff for xml-picklers-0.3.6
+diff --git a/src/Data/XML/Pickle/Basic.hs b/src/Data/XML/Pickle/Basic.hs
+index 8b309ac..06e8232 100644
+--- a/src/Data/XML/Pickle/Basic.hs
++++ b/src/Data/XML/Pickle/Basic.hs
+@@ -34,11 +34,10 @@ data UnpickleResult t a = UnpickleError UnpickleError
+ 
+ 
+ instance Applicative (UnpickleResult t) where
+-    pure = return
++    pure x = Result x Nothing
+     (<*>) = ap
+ 
+ instance Monad (UnpickleResult t) where
+-    return x = Result x Nothing
+     Result x r >>= f = case f x of
+         Result y r' -> Result y (if isJust r then r else r')
+         y -> y
+
+
+# diff for yi-core-0.19.4
+diff --git a/src/Yi/Interact.hs b/src/Yi/Interact.hs
+index 23c7466..db8c3bc 100644
+--- a/src/Yi/Interact.hs
++++ b/src/Yi/Interact.hs
+@@ -119,7 +119,7 @@ instance Functor (I event w) where
+   fmap f i = pure f <*> i
+ 
+ instance Applicative (I ev w) where
+-    pure = return
++    pure  = Returns
+     a <*> b = do f <- a; x <- b; return (f x)
+ 
+ instance Alternative (I ev w) where
+@@ -127,7 +127,6 @@ instance Alternative (I ev w) where
+     (<|>) = Plus
+ 
+ instance Monad (I event w) where
+-  return  = Returns
+   (>>=)   = Binds
+ #if (!MIN_VERSION_base(4,13,0))
+   fail _ = Fails
+@@ -233,10 +232,21 @@ data InteractState event w =  Ambiguous [(Int,w,P event w)] | Waiting | Dead | R
+ 
+ #if __GLASGOW_HASKELL__ >= 804 
+ instance Semigroup (InteractState event w) where
+-  (<>) = mappend
++    -- not used at the moment:
++    (<>) (Running w c) _ = Running w c
++    (<>) _ (Running w c) = Running w c
++    -- don't die if that can be avoided
++    (<>) Dead p = p
++    (<>) p Dead = p
++    -- If a branch is not determined, wait for it.
++    (<>) Waiting _ = Waiting
++    (<>) _ Waiting = Waiting
++    -- ambiguity remains
++    (<>) (Ambiguous a) (Ambiguous b) = Ambiguous (a ++ b)
+ #endif
+ 
+ instance Monoid (InteractState event w) where
++#if __GLASGOW_HASKELL__ < 804 
+     -- not used at the moment:
+     mappend (Running w c) _ = Running w c
+     mappend _ (Running w c) = Running w c
+@@ -248,6 +258,7 @@ instance Monoid (InteractState event w) where
+     mappend _ Waiting = Waiting
+     -- ambiguity remains
+     mappend (Ambiguous a) (Ambiguous b) = Ambiguous (a ++ b)
++#endif
+     mempty = Ambiguous []
+ 
+ 
+diff --git a/src/Yi/Types.hs b/src/Yi/Types.hs
+index 2fe9539..84c410f 100644
+--- a/src/Yi/Types.hs
++++ b/src/Yi/Types.hs
+@@ -168,7 +168,7 @@ extractTopKeymap kms = forever (topKeymap kms)
+ 
+ -- | The BufferM monad writes the updates performed.
+ newtype BufferM a = BufferM { fromBufferM :: ReaderT Window (State FBuffer) a }
+-    deriving ( Monad, Functor, Typeable
++    deriving ( Monad, Applicative, Functor, Typeable
+              , MonadState FBuffer
+              , MonadReader Window )
+ 
+@@ -184,10 +184,6 @@ data IndentSettings = IndentSettings
+   , shiftWidth :: !Int  -- ^ Indent by so many columns
+   } deriving (Eq, Show, Typeable)
+ 
+-instance Applicative BufferM where
+-    pure = return
+-    (<*>) = ap
+-
+ data FBuffer = forall syntax.
+         FBuffer { bmode  :: !(Mode syntax)
+                 , rawbuf :: !(BufferImpl syntax)
+
+
+# diff for yi-rope-0.11
+diff --git a/src/Yi/Rope.hs b/src/Yi/Rope.hs
+index a6961c0..32ac977 100644
+--- a/src/Yi/Rope.hs
++++ b/src/Yi/Rope.hs
+@@ -118,12 +118,14 @@ countNl = TX.count "\n"
+ 
+ #if __GLASGOW_HASKELL__ >= 804
+ instance Semigroup Size where
+-  (<>) = mappend
++  Indices c l <> Indices c' l' = Indices (c + c') (l + l')
+ #endif
+ 
+ instance Monoid Size where
+   mempty = Indices 0 0
++#if __GLASGOW_HASKELL__ < 804
+   Indices c l `mappend` Indices c' l' = Indices (c + c') (l + l')
++#endif
+ 
+ instance Measured Size YiChunk where
+   measure (Chunk l t) = Indices l (countNl t)
+@@ -161,12 +163,14 @@ instance IsString YiString where
+ 
+ #if __GLASGOW_HASKELL__ >= 804
+ instance Semigroup YiString where
+-  (<>) = mappend
++  (<>) = Yi.Rope.append
+ #endif
+ 
+ instance Monoid YiString where
+   mempty = Yi.Rope.empty
++#if __GLASGOW_HASKELL__ < 804
+   mappend = Yi.Rope.append
++#endif
+   mconcat = Yi.Rope.concat
+ 
+ instance Ord YiString where
