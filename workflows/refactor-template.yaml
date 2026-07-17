@@ -53,11 +53,11 @@ spec:
         description: "Branch the agent's changes are pushed to (on the fork)."
 
       - name: agent-image
-        value: "ghcr.io/REPLACE_ME/refactor-agent:latest"
+        value: "ghcr.io/ludat/refactor-agent:latest"
         description: "Image built from agent/Dockerfile (patch set + apply/resolve script)."
 
       - name: build-server-image
-        value: "ghcr.io/REPLACE_ME/refactor-build-server:latest"
+        value: "ghcr.io/ludat/refactor-build-server:latest"
         description: "Carrier image (buildserver/Dockerfile) holding the static /execute binary."
 
       - name: toolchain-image
