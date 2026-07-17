@@ -15,7 +15,7 @@ agent loop.
 ## DAG
 
 ```
-resolve-repo ─► clone-repo ─► run-agent ─► push-and-pr
+resolve-repo ─► clone-repo ─► run-agent ─► push-branch ─► [await-approval] ─► open-pr
 
 onExit: delete-workspace   (always runs)
 ```
@@ -26,9 +26,23 @@ rejected). The clone, agent, and push steps share one JuiceFS-backed RWX PVC,
 each subPathed under the workflow name, so they all operate on the same on-disk
 checkout.
 
-`push-and-pr` forks the upstream repo into the bot's own account (`gh repo
-fork`), pushes the branch there, and opens a **cross-fork PR** against upstream —
-so the bot never needs write access to the target repos.
+`push-branch` forks the upstream repo into the bot's own account (`gh repo
+fork`) and pushes the branch there — so the bot never needs write access to the
+target repos. It does **not** open the PR.
+
+### Manual approval gate
+
+The PR is not opened automatically. After the branch is pushed, the workflow
+**suspends** at `await-approval` and waits for you:
+
+```sh
+argo resume <workflow-name>     # opens the PR (or click Resume in the Argo UI)
+```
+
+Until you resume, the branch sits on the fork with no PR. To abandon it, leave
+the workflow suspended or `argo stop <workflow-name>` — the branch stays pushed,
+no PR is ever opened. The gate (and `open-pr`) are skipped automatically when the
+agent produced no changes.
 
 ## The build sidecar (no Sandbox CRD)
 
@@ -57,12 +71,14 @@ No step touches the Kubernetes API — there are no resource steps at all.
 | resolve-repo            |           | **none** |
 | clone-repo              | ✓         |         |
 | run-agent (+ sidecar)   |           | **none** |
-| push-and-pr             | ✓ (fork + push + PR) |  |
+| push-branch             | ✓ (fork + push) |   |
+| await-approval          |           | **none** (suspend) |
+| open-pr                 | ✓ (PR)    |         |
 
 `run-agent` runs as the permission-less `refactor-agent` ServiceAccount with
 `automountServiceAccountToken: false`, so neither the agent nor the build
 sidecar can reach the API server, and neither holds a secret. The git token is
-mounted only in the clone and push steps.
+mounted only in the clone, push, and open-pr steps.
 
 ## Files
 
