@@ -13,7 +13,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteMany
-  storageClassName: juicefs-sc
+  storageClassName: juicefs-cheap-shared
   resources:
     requests:
       storage: 50Gi
