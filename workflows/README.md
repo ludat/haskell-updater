@@ -53,6 +53,18 @@ happens next:
 Regardless of mode, `open-pr` is skipped automatically when the agent produced no
 changes (nothing to PR).
 
+**Open-the-PR link.** `push-branch` prints a GitHub *compare* URL (and exposes it
+as the `pr-url` workflow output) that opens the PR form pre-filled — handy in
+`skip` mode or before resuming a `manual` run:
+
+```sh
+argo get <workflow-name> -o jsonpath='{.status.outputs.parameters[?(@.name=="pr-url")].value}'
+```
+
+It's also printed in the `push-branch` logs and shown in the Argo UI's Outputs
+panel. Clicking it lands on GitHub's "Open a pull request" page — base set to the
+upstream branch, head to the fork's branch.
+
 ## The build sidecar (no Sandbox CRD)
 
 `cabal build` compiles untrusted third-party code (custom `Setup.hs`, Template

@@ -93,6 +93,8 @@ spec:
               parameters:
                 - name: repo
                   value: "{{tasks.resolve-repo.outputs.parameters.repo}}"
+                - name: base-branch
+                  value: "{{tasks.clone-repo.outputs.parameters.base-branch}}"
 
           - name: await-approval
             template: await-approval
@@ -117,6 +119,14 @@ spec:
                   value: "{{tasks.push-branch.outputs.parameters.fork-owner}}"
                 - name: base-branch
                   value: "{{tasks.clone-repo.outputs.parameters.base-branch}}"
+      # Bubble the compare URL up to the workflow outputs, so `argo get <wf>`
+      # (and the UI's Outputs panel) show the click-to-open-PR link.
+      outputs:
+        parameters:
+          - name: pr-url
+            valueFrom:
+              default: ""
+              parameter: "{{tasks.push-branch.outputs.parameters.pr-url}}"
 
     # ─────────────────────── resolve-repo ───────────────────────
     # Hackage package -> upstream git repo URL. Uses the agent image's `resolve`
@@ -277,6 +287,7 @@ spec:
       inputs:
         parameters:
           - name: repo
+          - name: base-branch
       volumes:
         - name: git-creds
           secret:
@@ -298,10 +309,11 @@ spec:
           USERNAME="$(cat /secrets/git/username)"
           export GH_TOKEN="$TOKEN"
           UPSTREAM='{{inputs.parameters.repo}}'         # https://github.com/owner/name
+          BASE='{{inputs.parameters.base-branch}}'
           BRANCH='{{workflow.parameters.pr-branch}}'
           FORK_ORG='{{workflow.parameters.fork-org}}'   # empty = fork to the bot user
           printf 'false' > /tmp/changed        # default outputs (see valueFrom defaults)
-          : > /tmp/slug; : > /tmp/fork-owner
+          : > /tmp/slug; : > /tmp/fork-owner; : > /tmp/pr-url
           cd /workspace/repo
 
           if git diff --cached --quiet; then
@@ -334,10 +346,19 @@ spec:
             echo "fork not ready yet, retrying ($n)..."; sleep 5
           done
 
+          # GitHub "compare" URL: opens the PR form pre-filled (base <- upstream,
+          # head <- fork). Click it to open the PR yourself (e.g. in skip mode or
+          # before resuming a manual run).
+          PR_URL="https://github.com/${SLUG}/compare/${BASE}...${FORK_OWNER}:${BRANCH}?expand=1"
+
           printf '%s' "$SLUG" > /tmp/slug
           printf '%s' "$FORK_OWNER" > /tmp/fork-owner
+          printf '%s' "$PR_URL" > /tmp/pr-url
           printf 'true' > /tmp/changed
-          echo "Pushed ${FORK_OWNER}:${BRANCH} to fork of ${SLUG}. Awaiting approval to open PR."
+          echo "Pushed ${FORK_OWNER}:${BRANCH} to fork of ${SLUG}."
+          echo "==================================================================="
+          echo " Open the PR:  $PR_URL"
+          echo "==================================================================="
       outputs:
         parameters:
           - name: changed
@@ -352,6 +373,10 @@ spec:
             valueFrom:
               default: ""
               path: /tmp/fork-owner
+          - name: pr-url
+            valueFrom:
+              default: ""
+              path: /tmp/pr-url
 
     # ─────────────────────── await-approval ───────────────────────
     # Manual gate: the workflow suspends here until you approve. Resume with
