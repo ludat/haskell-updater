@@ -26,9 +26,12 @@ rejected). The clone, agent, and push steps share one JuiceFS-backed RWX PVC,
 each subPathed under the workflow name, so they all operate on the same on-disk
 checkout.
 
-`push-branch` forks the upstream repo into the bot's own account (`gh repo
-fork`) and pushes the branch there — so the bot never needs write access to the
-target repos. It does **not** open the PR.
+`push-branch` forks the upstream repo (`gh repo fork`) and pushes the branch
+there — so the bot never needs write access to the target repos. It does **not**
+open the PR. By default the fork lands in the bot user's own account; set
+`fork-org=<org>` to fork into a GitHub organization instead (handy when several
+people need to open/review the PR later — the token's account must be able to
+create repos in that org).
 
 ### When the PR is opened — `pr-mode`
 
@@ -146,10 +149,13 @@ pulled directly — nothing to build for it; only the tiny build-server carrier 
 
 ```sh
 ./submit.sh heap-1.0.4 --watch
+./submit.sh heap-1.0.4 -p fork-org=my-org      # fork into an org instead of the bot user
 # or a batch (one Hackage package per line):
 cp packages.example.txt packages.txt && $EDITOR packages.txt
 ./submit-batch.sh packages.txt
 ```
 
 The bot's GitHub account (the `git-credentials` token) must be allowed to fork
-the target repos and open PRs — no write access to upstream is needed.
+the target repos and open PRs — no write access to upstream is needed. To fork
+into an organization (`fork-org`), the token's account must also be able to
+create repositories in that org.

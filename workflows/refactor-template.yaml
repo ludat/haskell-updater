@@ -23,6 +23,12 @@ spec:
         value: "amp-no-return-refactor"
         description: "Branch the agent's changes are pushed to (on the fork)."
 
+      - name: fork-org
+        value: ""
+        description: >-
+          GitHub org to create the fork in (the token's account must be able to
+          create repos there). Empty = fork into the bot user's own account.
+
       - name: pr-mode
         value: "manual"
         enum:
@@ -293,6 +299,7 @@ spec:
           export GH_TOKEN="$TOKEN"
           UPSTREAM='{{inputs.parameters.repo}}'         # https://github.com/owner/name
           BRANCH='{{workflow.parameters.pr-branch}}'
+          FORK_ORG='{{workflow.parameters.fork-org}}'   # empty = fork to the bot user
           printf 'false' > /tmp/changed        # default outputs (see valueFrom defaults)
           : > /tmp/slug; : > /tmp/fork-owner
           cd /workspace/repo
@@ -308,9 +315,15 @@ spec:
 
           # owner/name for gh commands.
           SLUG="$(printf '%s' "$UPSTREAM" | sed -E 's#https?://[^/]+/##; s#\.git$##')"
-          # Fork into the bot's account (idempotent; no-op if it already exists).
-          gh repo fork "$SLUG" --clone=false
-          FORK_OWNER="$(gh api user --jq .login)"
+          # Fork (idempotent; no-op if it already exists) -- into an org if given,
+          # else the bot user's own account. FORK_OWNER is the fork's owner.
+          if [ -n "$FORK_ORG" ]; then
+            gh repo fork "$SLUG" --org "$FORK_ORG" --clone=false
+            FORK_OWNER="$FORK_ORG"
+          else
+            gh repo fork "$SLUG" --clone=false
+            FORK_OWNER="$(gh api user --jq .login)"
+          fi
           FORK_NAME="${SLUG#*/}"
 
           # Push the branch to the fork (retry: the fork may take a moment to appear).
