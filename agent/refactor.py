@@ -497,6 +497,11 @@ def cmd_run(args: argparse.Namespace) -> int:
           flush=True)
     result["diff_stat"] = diff_stat(diffs[key])
 
+    if args.show_patch:
+        print(f"[patch] ----- begin diff '{key}' ({result['diff_stat']}) -----", flush=True)
+        print(diffs[key], flush=True)
+        print(f"[patch] ----- end diff '{key}' -----", flush=True)
+
     # Apply (trusted, local) -- into the discovered package dir. git apply runs
     # from the checkout root with --directory so subdir packages patch correctly.
     rel_dir = os.path.relpath(pkg_dir, root)
@@ -607,6 +612,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--skip-build", action="store_true",
                      default=truthy(os.environ.get("SKIP_BUILD", "")),
                      help="apply only; do not build (local testing)")
+    run.add_argument("--no-show-patch", dest="show_patch", action="store_false",
+                     default=truthy(os.environ.get("SHOW_PATCH", "true")),
+                     help="don't print the selected diff before applying (on by default)")
     run.add_argument("--timeout", type=int,
                      default=int(os.environ.get("BUILD_TIMEOUT", "3600")))
     run.set_defaults(func=cmd_run)
