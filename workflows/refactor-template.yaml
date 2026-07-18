@@ -283,14 +283,13 @@ spec:
           : > /tmp/slug; : > /tmp/fork-owner
           cd /workspace/repo
 
-          if git diff --quiet && git diff --cached --quiet; then
+          if git diff --cached --quiet; then
             echo "No changes produced by agent; nothing to push, skipping PR."
             exit 0
           fi
 
           git config user.name "$USERNAME"
           git config user.email "${USERNAME}@users.noreply.github.com"
-          git add -A
           git commit -m "Monad of No Return: prefer pure over redundant return (AMP)"
 
           # owner/name for gh commands.

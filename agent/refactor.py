@@ -338,13 +338,10 @@ def apply_diff(repo_root: str, rel_dir: str, diff_text: str) -> None:
     ``--directory`` is the only reliable way to target a subdir.
     """
     patch = diff_text if diff_text.endswith("\n") else diff_text + "\n"
-    # Only pass --directory for an actual subdir; `--directory=.` makes git build
-    # a "./..." path that some git versions reject as invalid. Root packages
-    # apply cleanly with no --directory.
+
     dir_flag = ([f"--directory={rel_dir}"] if rel_dir and rel_dir != "." else [])
-    # --check first for a clear diagnostic, then apply for real. The patch is
-    # fed on stdin (`git apply -`) rather than via a temp file.
-    for extra in (["--check"], []):
+
+    for phase, extra in (("verify", ["--check"]), ("apply", ["--index"])):
         proc = subprocess.run(
             ["git", "-C", repo_root, "apply", "--whitespace=nowarn",
              *dir_flag, *extra, "-"],
@@ -353,9 +350,8 @@ def apply_diff(repo_root: str, rel_dir: str, diff_text: str) -> None:
             text=True,
         )
         if proc.returncode != 0:
-            stage = "verify" if extra else "apply"
             raise RuntimeError(
-                f"git apply --{stage} failed (exit {proc.returncode}):\n{proc.stderr.strip()}"
+                f"git apply --{phase} failed (exit {proc.returncode}):\n{proc.stderr.strip()}"
             )
 
 
