@@ -20,7 +20,7 @@ spec:
         description: "Upstream branch to PR against; empty = auto-detect the repo's default branch."
 
       - name: pr-branch
-        value: "amp-no-return-refactor"
+        value: "no-return-refactor"
         description: "Branch the agent's changes are pushed to (on the fork)."
 
       - name: fork-org
@@ -323,7 +323,15 @@ spec:
 
           git config user.name "$USERNAME"
           git config user.email "${USERNAME}@users.noreply.github.com"
-          git commit -m "Monad of No Return: prefer pure over redundant return (AMP)"
+
+          cat > /tmp/commit-msg <<'COMMIT_EOF'
+          Remove noncanonical definitions.
+
+          This appeases the `-Wnoncanonical-monad-instances` warning. A future GHC
+          release will treat noncanonical definitions as errors. See
+          https://github.com/haskell/core-libraries-committee/issues/328.
+          COMMIT_EOF
+          git commit -F /tmp/commit-msg
 
           # owner/name for gh commands.
           SLUG="$(printf '%s' "$UPSTREAM" | sed -E 's#https?://[^/]+/##; s#\.git$##')"
@@ -413,15 +421,8 @@ spec:
           gh pr create \
             --repo '{{inputs.parameters.slug}}' \
             --base '{{inputs.parameters.base-branch}}' \
-            --head '{{inputs.parameters.fork-owner}}:{{workflow.parameters.pr-branch}}' \
-            --title "Monad of No Return: prefer pure over redundant return" \
-            --body "Automated AMP-style refactor (return -> pure). Verified with cabal build in an isolated build container." \
-            || echo "gh pr create failed (branch already pushed to fork; open PR manually)."
+            --head '{{inputs.parameters.fork-owner}}:{{workflow.parameters.pr-branch}}'
 
-    # ───────────────────────── cleanup ──────────────────────────
-    # onExit handler: runs on success AND failure/crash of the main DAG. The
-    # build sidecar is torn down automatically with the run-agent pod, so only
-    # the shared workspace subpath needs clearing.
     - name: cleanup
       steps:
         - - name: delete-workspace
