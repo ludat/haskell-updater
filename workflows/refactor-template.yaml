@@ -302,7 +302,7 @@ spec:
           # Push the branch to the fork (retry: the fork may take a moment to appear).
           FORK_URL="https://${USERNAME}:${TOKEN}@github.com/${FORK_OWNER}/${FORK_NAME}.git"
           n=0
-          until git push --force-with-lease "$FORK_URL" "$BRANCH"; do
+          until git push --force "$FORK_URL" "$BRANCH"; do
             n=$((n+1)); [ "$n" -ge 5 ] && { echo "push to fork failed"; exit 1; }
             echo "fork not ready yet, retrying ($n)..."; sleep 5
           done
