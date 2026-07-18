@@ -19,6 +19,17 @@ spec:
         value: ""
         description: "Upstream branch to PR against; empty = auto-detect the repo's default branch."
 
+      - name: max-age-years
+        value: "7"
+        description: "Fail if the repo's last commit is older than this many years (likely abandoned)."
+
+      - name: allow-stale
+        value: "false"
+        enum:
+          - "true"
+          - "false"
+        description: "Run even if the repo is older than max-age-years (bypass the staleness check)."
+
       - name: pr-branch
         value: "no-return-refactor"
         description: "Branch the agent's changes are pushed to (on the fork)."
@@ -187,6 +198,21 @@ spec:
             BASE="$(git -C /workspace/repo rev-parse --abbrev-ref HEAD)"
           fi
           printf '%s' "$BASE" > /tmp/base-branch
+
+          # Staleness gate: fail if the last commit is older than max-age-years
+          # (a likely-abandoned repo), unless allow-stale=true.
+          LAST_TS="$(git -C /workspace/repo log -1 --format=%ct)"   # committer date, unix epoch
+          THRESHOLD_TS=$(( $(date +%s) - {{workflow.parameters.max-age-years}} * 31557600 ))
+          echo "Last commit: $(git -C /workspace/repo log -1 --format=%cI)"
+          if [ "$LAST_TS" -lt "$THRESHOLD_TS" ]; then
+            if [ '{{workflow.parameters.allow-stale}}' = 'true' ]; then
+              echo "Repo older than {{workflow.parameters.max-age-years}}y, but allow-stale=true; continuing."
+            else
+              echo "Repo's last commit is older than {{workflow.parameters.max-age-years}} years; failing." >&2
+              echo "Re-run with -p allow-stale=true to proceed anyway." >&2
+              exit 1
+            fi
+          fi
 
           # Drop the token-bearing remote; push step sets its own authenticated remote.
           git -C /workspace/repo remote set-url origin "$REPO"

@@ -26,6 +26,10 @@ rejected). The clone, agent, and push steps share one JuiceFS-backed RWX PVC,
 each subPathed under the workflow name, so they all operate on the same on-disk
 checkout.
 
+`clone-repo` also **fails fast on abandoned repos**: if the last commit is older
+than `max-age-years` (default 7) it stops the run — set `-p allow-stale=true` to
+proceed anyway.
+
 `push-branch` forks the upstream repo (`gh repo fork`) and pushes the branch
 there — so the bot never needs write access to the target repos. It does **not**
 open the PR. By default the fork lands in the bot user's own account; set
