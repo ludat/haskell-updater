@@ -1,10 +1,14 @@
 # Shared RWX workspace backed by JuiceFS.
 #
-# Every workflow run subPaths into this single PVC under /workspace/<workflow-name>,
-# so the clone step, the run-agent pod (agent + build sidecar), and the push step
-# all see the same on-disk checkout. ReadWriteMany is what lets these separate
-# step pods mount it (potentially across nodes).
+# Two kinds of subPath live in this single PVC:
+#   <workflow-name>/  — per-run checkout (clone, run-agent pod, push); cleared on exit.
+#   cabal-cache/      — SHARED cabal home (CABAL_DIR): Hackage index + nix-style
+#                       store of compiled deps, reused across ALL runs and never
+#                       cleared, so dependencies are downloaded/compiled once.
+# ReadWriteMany is what lets these separate step pods (and concurrent runs sharing
+# the cache) mount it, potentially across nodes.
 #
+# The shared store can grow; bump `storage` if you refactor many packages.
 # Adjust storageClassName to match your JuiceFS StorageClass and namespace as needed.
 apiVersion: v1
 kind: PersistentVolumeClaim

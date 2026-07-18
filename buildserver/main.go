@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -85,8 +86,8 @@ func main() {
 		cmd := exec.CommandContext(ctx, req.Command[0], req.Command[1:]...)
 		cmd.Dir = cwd
 		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
+		cmd.Stdout = io.MultiWriter(os.Stdout, &stdout)
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
 		err := cmd.Run()
 
 		resp := execResponse{Stdout: stdout.String(), Stderr: stderr.String()}
@@ -105,6 +106,7 @@ func main() {
 				resp.ExitCode = 127
 			}
 		}
+		log.Printf("exit %d: %v", resp.ExitCode, req.Command)
 		writeJSON(w, http.StatusOK, resp)
 	})
 

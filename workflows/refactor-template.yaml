@@ -198,6 +198,12 @@ spec:
               value: "8080"
             - name: WORKDIR
               value: /workspace/repo
+            # Point cabal's whole home (config + Hackage index + nix-style store)
+            # at a shared PVC subpath, so the downloaded index and compiled
+            # dependencies are reused across every run instead of rebuilt. The Go
+            # build-server passes its env through to the cabal subprocess.
+            - name: CABAL_DIR
+              value: /cabal
           volumeMounts:
             - name: tools
               mountPath: /opt/tools
@@ -205,6 +211,11 @@ spec:
             - name: workspace
               mountPath: /workspace
               subPath: "{{workflow.name}}"
+            # Constant subPath (NOT per-workflow), so the cache persists and is
+            # shared. cleanup only clears the per-run subpath, never this one.
+            - name: workspace
+              mountPath: /cabal
+              subPath: cabal-cache
       container:
         image: "{{workflow.parameters.agent-image}}"
         args: ["run"]

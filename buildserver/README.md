@@ -19,6 +19,14 @@ POST /execute  {"command": ["cabal","build","all"], "cwd": "/workspace/repo"}
 
 This is exactly what `refactor.py`'s `builder_exec` / `wait_for_builder` speak.
 
+Each command's stdout/stderr is both returned in the JSON reply **and** streamed
+live to the server's own stdout/stderr, so the build output shows up in this
+container's logs as it runs:
+
+```sh
+kubectl logs <run-agent-pod> -c build-server -f
+```
+
 ## Why a static binary + stock image
 
 The binary is built `CGO_ENABLED=0` (stdlib only), so it's fully static and

@@ -62,6 +62,13 @@ external Agent Sandbox, `run-agent` carries a **build-server sidecar**
 The whole pod is credential-free (no secrets, no k8s token), so the untrusted
 build has nothing to steal. The sidecar is torn down automatically with the pod.
 
+**Shared cabal cache.** The sidecar sets `CABAL_DIR=/cabal`, mounted from a
+constant `cabal-cache` subpath of the workspace PVC (not the per-run subpath). So
+cabal's Hackage index and nix-style store of compiled dependencies persist and
+are shared across every run — a dependency is downloaded and compiled once, then
+reused. It's never cleared by `delete-workspace`. cabal's store uses per-package
+locks, so concurrent runs can share it safely.
+
 ## Credential isolation
 
 No application container touches the Kubernetes API — there are no resource
