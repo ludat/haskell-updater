@@ -10,6 +10,11 @@ spec:
   executor:
     serviceAccountName: refactor-agent
 
+  workflowMetadata:
+    labelsFrom:
+      package:
+        expression: "workflow.parameters.package"
+
   arguments:
     parameters:
       - name: package
@@ -144,18 +149,33 @@ spec:
     # subcommand (fetches the package's .cabal from public Hackage, reads its
     # source-repository). No secrets, no k8s API access.
     - name: resolve-repo
-      container:
+      script:
         image: "{{workflow.parameters.agent-image}}"
-        command: ["python3", "/app/refactor.py"]
-        args: ["resolve", "{{workflow.parameters.package}}", "--out-dir", "/tmp/resolve"]
+        command: [sh]
+        source: |
+          set -eu
+          if python3 /app/refactor.py resolve '{{workflow.parameters.package}}' --out-dir /tmp/resolve; then
+            printf 'resolved upstream repo' > /tmp/description
+          else
+            printf 'could not resolve upstream repo (not found / non-git)' > /tmp/description
+            exit 1
+          fi
       outputs:
         parameters:
           - name: repo
             valueFrom:
+              default: ""
               path: /tmp/resolve/repo
           - name: name
             valueFrom:
+              default: ""
               path: /tmp/resolve/name
+          # Global run-description: last step to write it wins; persists on failure.
+          - name: description
+            globalName: run-description
+            valueFrom:
+              default: ""
+              path: /tmp/description
 
     # ─────────────────────── clone-repo ───────────────────────
     # Clones the upstream repo's default branch (many old Haskell repos use
@@ -189,6 +209,7 @@ spec:
             | sed "s#https://#https://${USERNAME}:${TOKEN}@#")"
           rm -rf /workspace/repo
 
+          printf 'failed to clone repo' > /tmp/description   # default until we succeed
           BASE='{{workflow.parameters.base-branch}}'
           if [ -n "$BASE" ]; then
             git clone --branch "$BASE" --depth 1 "$AUTH_URL" /workspace/repo
@@ -208,6 +229,7 @@ spec:
             if [ '{{workflow.parameters.allow-stale}}' = 'true' ]; then
               echo "Repo older than {{workflow.parameters.max-age-years}}y, but allow-stale=true; continuing."
             else
+              printf 'last repo commit too old' > /tmp/description
               echo "Repo's last commit is older than {{workflow.parameters.max-age-years}} years; failing." >&2
               echo "Re-run with -p allow-stale=true to proceed anyway." >&2
               exit 1
@@ -217,12 +239,18 @@ spec:
           # Drop the token-bearing remote; push step sets its own authenticated remote.
           git -C /workspace/repo remote set-url origin "$REPO"
           git -C /workspace/repo checkout -b '{{workflow.parameters.pr-branch}}'
+          printf 'cloned; applying diff' > /tmp/description   # overwritten by run-agent
           echo "Cloned $REPO @ $(git -C /workspace/repo rev-parse --short HEAD) (base: $BASE)"
       outputs:
         parameters:
           - name: base-branch
             valueFrom:
               path: /tmp/base-branch
+          - name: description
+            globalName: run-description
+            valueFrom:
+              default: ""
+              path: /tmp/description
 
     # ───────────────────────── run-agent ─────────────────────────
     # Selects this package's precomputed diff from the patch set baked into the
@@ -300,9 +328,16 @@ spec:
           - name: result
             valueFrom:
               # refactor.py writes {package, matched_key, package_dir, applied,
-              # build, status, diff_stat} here.
+              # build, status, diff_stat, description} here.
               default: "{}"
               path: /workspace/result.json
+          # refactor.py writes a one-line outcome ("failed to compile", "tests
+          # failed", "built successfully", ...) here for the run-description.
+          - name: description
+            globalName: run-description
+            valueFrom:
+              default: ""
+              path: /tmp/description
 
     # ──────────────────────── push-branch ────────────────────────
     # Forks the upstream repo into the bot's own account and pushes the branch to
@@ -344,6 +379,7 @@ spec:
 
           if git diff --cached --quiet; then
             echo "No changes produced by agent; nothing to push, skipping PR."
+            printf 'built, but no changes to apply' > /tmp/description
             exit 0
           fi
 
@@ -394,6 +430,7 @@ spec:
           printf '%s' "$FORK_OWNER" > /tmp/fork-owner
           printf '%s' "$PR_URL" > /tmp/pr-url
           printf 'true' > /tmp/changed
+          printf 'built; branch pushed to fork' > /tmp/description
           echo "Pushed ${FORK_OWNER}:${BRANCH} to fork of ${SLUG}."
           echo "==================================================================="
           echo " Open the PR:  $PR_URL"
@@ -416,6 +453,11 @@ spec:
             valueFrom:
               default: ""
               path: /tmp/pr-url
+          - name: description
+            globalName: run-description
+            valueFrom:
+              default: ""
+              path: /tmp/description
 
     # ─────────────────────── await-approval ───────────────────────
     # Manual gate: the workflow suspends here until you approve. Resume with
@@ -447,12 +489,21 @@ spec:
         command: [sh]
         source: |
           set -eu
+          printf 'failed to open PR' > /tmp/description   # until gh succeeds
           apk add --no-cache github-cli >/dev/null 2>&1 || apk add --no-cache gh >/dev/null 2>&1
           export GH_TOKEN="$(cat /secrets/git/token)"
           gh pr create \
             --repo '{{inputs.parameters.slug}}' \
             --base '{{inputs.parameters.base-branch}}' \
             --head '{{inputs.parameters.fork-owner}}:{{workflow.parameters.pr-branch}}'
+          printf 'PR opened' > /tmp/description
+      outputs:
+        parameters:
+          - name: description
+            globalName: run-description
+            valueFrom:
+              default: ""
+              path: /tmp/description
 
     - name: cleanup
       steps:

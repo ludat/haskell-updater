@@ -455,18 +455,48 @@ def run_build(builder_url: str, cwd: str, run_tests: bool, do_update: bool,
 # Orchestration
 # --------------------------------------------------------------------------- #
 
-def write_result(path: str, result: dict) -> None:
+# Short human-readable outcome per status, for the workflow's run-description.
+DESCRIPTIONS = {
+    "package-not-found": "package not found in checkout",
+    "apply-failed": "failed to apply diff",
+    "applied-no-build": "diff applied (build skipped)",
+    "no-builder": "no build server configured",
+    "builder-error": "build server unreachable",
+    "compile-failed": "failed to compile",
+    "tests-failed": "tests failed",
+    "error": "error",
+}
+
+
+def describe(result: dict) -> str:
+    status = result["status"]
+    if status == "success":
+        build = result.get("build") or {}
+        return "built and tests passed" if build.get("tests_ok") else "built successfully"
+    return DESCRIPTIONS.get(status, status)
+
+
+def write_result(path: str, result: dict, desc_path: str = "") -> None:
+    result["description"] = describe(result)
+    print(f"[done] status={result['status']} -- {result['description']}", flush=True)
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(result, fh, indent=2)
-        print(f"[result] wrote {path}", flush=True)
     except OSError as exc:
         print(f"[result] could not write {path}: {exc}", file=sys.stderr, flush=True)
+    # One-line description for the Argo run-description output parameter.
+    if desc_path:
+        try:
+            with open(desc_path, "w", encoding="utf-8") as fh:
+                fh.write(result["description"])
+        except OSError as exc:
+            print(f"[desc] could not write {desc_path}: {exc}", file=sys.stderr, flush=True)
 
 
 def cmd_run(args: argparse.Namespace) -> int:
     root = args.workdir
     result_path = args.result
+    desc_path = args.description
     result: dict = {"package": None, "matched_key": None, "package_dir": None,
                     "applied": False, "build": None, "status": "error"}
 
@@ -481,7 +511,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         result["status"] = "package-not-found"
         result["error"] = str(exc)
         print(f"[select] FAILED: {exc}", file=sys.stderr, flush=True)
-        write_result(result_path, result)
+        write_result(result_path, result, desc_path)
         return 1
     result["package_dir"] = pkg_dir
 
@@ -511,14 +541,14 @@ def cmd_run(args: argparse.Namespace) -> int:
         result["status"] = "apply-failed"
         result["error"] = str(exc)
         print(f"[apply] FAILED: {exc}", file=sys.stderr, flush=True)
-        write_result(result_path, result)
+        write_result(result_path, result, desc_path)
         return 2
     result["applied"] = True
     print(f"[apply] applied '{key}' ({result['diff_stat']})", flush=True)
 
     if args.skip_build:
         result["status"] = "applied-no-build"
-        write_result(result_path, result)
+        write_result(result_path, result, desc_path)
         return 0
 
     # Build (untrusted, in the build-server sidecar).
@@ -526,7 +556,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         result["status"] = "no-builder"
         result["error"] = "BUILDER_URL not set; cannot build untrusted code safely"
         print("[build] BUILDER_URL not set -- refusing to build locally", file=sys.stderr)
-        write_result(result_path, result)
+        write_result(result_path, result, desc_path)
         return 3
 
     # The sidecar shares this same mount path, so the discovered package dir is
@@ -540,13 +570,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         result["status"] = "builder-error"
         result["error"] = f"builder exec failed: {exc}"
         print(f"[build] builder error: {exc}", file=sys.stderr, flush=True)
-        write_result(result_path, result)
+        write_result(result_path, result, desc_path)
         return 4
 
     result["build"] = build
-    result["status"] = "success" if build["ok"] else "build-failed"
-    write_result(result_path, result)
-    print(f"[done] status={result['status']}", flush=True)
+    if not build["build_ok"]:
+        result["status"] = "compile-failed"
+    elif build["tests_ok"] is False:
+        result["status"] = "tests-failed"
+    else:
+        result["status"] = "success"
+    write_result(result_path, result, desc_path)
     return 0 if build["ok"] else 5
 
 
@@ -605,6 +639,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--build-cwd", default=env("BUILD_CWD"),
                      help="cwd for the build in the sidecar (default: discovered package dir)")
     run.add_argument("--result", default=env("RESULT_PATH"))
+    run.add_argument("--description", default=os.environ.get("DESCRIPTION_PATH", "/tmp/description"),
+                     help="write a one-line human outcome here (for the Argo run-description output)")
     run.add_argument("--run-tests", action="store_true",
                      default=truthy(os.environ.get("RUN_TESTS", "")))
     run.add_argument("--no-cabal-update", dest="cabal_update", action="store_false",
