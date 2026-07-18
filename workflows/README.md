@@ -64,7 +64,10 @@ build has nothing to steal. The sidecar is torn down automatically with the pod.
 
 ## Credential isolation
 
-No step touches the Kubernetes API — there are no resource steps at all.
+No application container touches the Kubernetes API — there are no resource
+steps, and no token is mounted in any main container. The SA's only RBAC is the
+standard Argo executor permission (`workflowtaskresults` create/patch), which the
+executor sidecar needs to report each step's result; it grants nothing else.
 
 | Step                    | git token | secrets |
 | ----------------------- | --------- | ------- |
@@ -75,10 +78,13 @@ No step touches the Kubernetes API — there are no resource steps at all.
 | await-approval          |           | **none** (suspend) |
 | open-pr                 | ✓ (PR)    |         |
 
-`run-agent` runs as the permission-less `refactor-agent` ServiceAccount with
-`automountServiceAccountToken: false`, so neither the agent nor the build
-sidecar can reach the API server, and neither holds a secret. The git token is
-mounted only in the clone, push, and open-pr steps.
+**Every** step runs as the single `refactor-agent` ServiceAccount with
+`automountServiceAccountToken: false` (set once at the workflow spec level), so
+no step's main container gets a token and none can reach the API server. The SA's
+token is mounted only into Argo's executor sidecar (via
+`executor.serviceAccountName`), and its lone permission is the Argo-required
+`workflowtaskresults` create/patch used to report step results — nothing else.
+The git token is mounted only in the clone, push, and open-pr steps.
 
 ## Files
 
@@ -86,7 +92,7 @@ mounted only in the clone, push, and open-pr steps.
 | ------------------------ | -------------------------------------------------- |
 | `namespace.yaml`         | `refactor-bot` namespace                           |
 | `workspace-pvc.yaml`     | JuiceFS RWX PVC shared by every run                |
-| `rbac.yaml`              | two permission-less ServiceAccounts (no k8s API)   |
+| `rbac.yaml`              | SA + minimal Argo executor role (task-result only) |
 | `secrets.example.yaml`   | template for the git secret (copy → `secrets.yaml`) |
 | `refactor-template.yaml` | the `haskell-refactor` WorkflowTemplate            |
 | `submit.sh`              | submit one run for a package                        |

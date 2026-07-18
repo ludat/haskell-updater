@@ -1,35 +1,3 @@
-# Haskell "Monad of No Return" refactor pipeline.
-#
-# The input is a HACKAGE PACKAGE (e.g. heap-1.0.4), not a git URL. resolve-repo
-# looks up the package's upstream git repository on Hackage; the pipeline then
-# forks that repo into the bot's own account and opens the PR from the fork.
-#
-#   resolve-repo ─► clone-repo ─► run-agent ─► push-branch ─► [await-approval] ─► open-pr
-#
-# The branch is committed and pushed to the fork automatically, but the PR is
-# NOT opened until you manually approve: the workflow SUSPENDS at await-approval.
-# Resume to open the PR:
-#   argo resume <workflow-name>        (or the Resume button in the Argo UI)
-# Leave it suspended / stop it to keep the branch pushed but never open a PR.
-#
-# onExit: delete-workspace (always runs, even on failure/crash).
-#
-# The build runs in a build-server SIDECAR next to run-agent (a stock Haskell
-# toolchain image with a static server binary injected by an initContainer), not
-# an external Sandbox CRD -- the agent talks to it over the pod's localhost.
-#
-# Submit one run with:
-#   argo submit -n refactor-bot --from workflowtemplate/haskell-refactor \
-#     -p package=heap-1.0.4
-#
-# Credential isolation (no step can reach the k8s API -- no resource steps exist):
-#   - resolve-repo                    : no secrets (public Hackage only)
-#   - clone-repo / push-branch / open-pr : git-credentials secret only
-#   - run-agent (+ build sidecar)     : NO secrets (applies patch, builds over localhost)
-#
-# run-agent is deterministic: it selects the precomputed diff for this package
-# from the patch set baked into its image, applies it, and asks the sidecar to
-# build. No LLM is involved.
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -37,7 +5,10 @@ metadata:
 spec:
   entrypoint: refactor
   onExit: cleanup
-  serviceAccountName: argo-refactor-runner
+  serviceAccountName: refactor-agent
+  automountServiceAccountToken: false
+  executor:
+    serviceAccountName: refactor-agent
 
   arguments:
     parameters:
@@ -132,8 +103,6 @@ spec:
     # subcommand (fetches the package's .cabal from public Hackage, reads its
     # source-repository). No secrets, no k8s API access.
     - name: resolve-repo
-      serviceAccountName: refactor-agent
-      automountServiceAccountToken: false
       container:
         image: "{{workflow.parameters.agent-image}}"
         command: ["python3", "/app/refactor.py"]
@@ -210,8 +179,6 @@ spec:
     # carrier image onto a shared emptyDir, and the sidecar runs it. Swapping the
     # toolchain version is just a parameter change -- no image rebuild.
     - name: run-agent
-      serviceAccountName: refactor-agent
-      automountServiceAccountToken: false
       volumes:
         - name: tools
           emptyDir: {}
