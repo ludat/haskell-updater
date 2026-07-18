@@ -30,19 +30,25 @@ checkout.
 fork`) and pushes the branch there — so the bot never needs write access to the
 target repos. It does **not** open the PR.
 
-### Manual approval gate
+### When the PR is opened — `pr-mode`
 
-The PR is not opened automatically. After the branch is pushed, the workflow
-**suspends** at `await-approval` and waits for you:
+The branch is always pushed to the fork; the `pr-mode` parameter decides what
+happens next:
+
+| `pr-mode`        | Behaviour |
+| ---------------- | --------- |
+| `manual` (default) | Workflow **suspends** at `await-approval`; the PR opens only when you `argo resume <workflow-name>` (or click Resume in the UI). Until then the branch sits on the fork with no PR — `argo stop` it to abandon. |
+| `auto`           | The PR opens immediately after the push, no waiting. |
+| `skip`           | No PR is ever opened — the branch is just left on the fork. |
 
 ```sh
-argo resume <workflow-name>     # opens the PR (or click Resume in the Argo UI)
+./submit.sh heap-1.0.4                     # manual (default): push, then wait
+./submit.sh heap-1.0.4 -p pr-mode=auto     # push + open PR right away
+./submit.sh heap-1.0.4 -p pr-mode=skip     # push only
 ```
 
-Until you resume, the branch sits on the fork with no PR. To abandon it, leave
-the workflow suspended or `argo stop <workflow-name>` — the branch stays pushed,
-no PR is ever opened. The gate (and `open-pr`) are skipped automatically when the
-agent produced no changes.
+Regardless of mode, `open-pr` is skipped automatically when the agent produced no
+changes (nothing to PR).
 
 ## The build sidecar (no Sandbox CRD)
 

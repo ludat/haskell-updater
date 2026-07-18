@@ -23,6 +23,18 @@ spec:
         value: "amp-no-return-refactor"
         description: "Branch the agent's changes are pushed to (on the fork)."
 
+      - name: pr-mode
+        value: "manual"
+        enum:
+          - manual
+          - auto
+          - skip
+        description: >-
+          When to open the PR after the branch is pushed:
+          manual = suspend and wait for `argo resume` (default);
+          auto = open it immediately, no waiting;
+          skip = never open a PR (just push the branch).
+
       - name: agent-image
         value: "ghcr.io/ludat/refactor-agent:latest"
         description: "Image built from agent/Dockerfile (patch set + apply/resolve script)."
@@ -37,6 +49,9 @@ spec:
 
       - name: run-tests
         value: "true"
+        enum:
+          - "true"
+          - "false"
         description: "If true, run 'cabal test all' in the sidecar after building."
 
 
@@ -55,7 +70,7 @@ spec:
 
           - name: clone-repo
             template: clone-repo
-            dependencies: [resolve-repo]
+            depends: "resolve-repo"
             arguments:
               parameters:
                 - name: repo
@@ -63,32 +78,31 @@ spec:
 
           - name: run-agent
             template: run-agent
-            dependencies: [clone-repo]
+            depends: "clone-repo"
 
-          # Commit + fork + push happen automatically...
           - name: push-branch
             template: push-branch
-            dependencies: [run-agent]
+            depends: "run-agent"
             arguments:
               parameters:
                 - name: repo
                   value: "{{tasks.resolve-repo.outputs.parameters.repo}}"
 
-          # ...then the workflow PAUSES here until you manually approve
-          # (`argo resume {{workflow.name}}` or the Resume button in the UI).
-          # Skipped when the agent produced no changes (nothing to open a PR for).
           - name: await-approval
             template: await-approval
-            dependencies: [push-branch]
-            when: "'{{tasks.push-branch.outputs.parameters.changed}}' == 'true'"
+            depends: "push-branch"
+            when: >-
+              '{{tasks.push-branch.outputs.parameters.changed}}' == 'true' &&
+              '{{workflow.parameters.pr-mode}}' == 'manual'
 
-          # Only runs after approval. The `when` also guards against Argo's
-          # dependency-skip semantics: with no changes it is skipped outright,
-          # never running with empty parameters.
           - name: open-pr
             template: open-pr
-            dependencies: [await-approval]
-            when: "'{{tasks.push-branch.outputs.parameters.changed}}' == 'true'"
+            depends: >-
+              push-branch.Succeeded &&
+              (await-approval.Succeeded || await-approval.Skipped || await-approval.Omitted)
+            when: >-
+              '{{tasks.push-branch.outputs.parameters.changed}}' == 'true' &&
+              '{{workflow.parameters.pr-mode}}' != 'skip'
             arguments:
               parameters:
                 - name: slug
