@@ -28,7 +28,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -111,9 +113,30 @@ func main() {
 	})
 
 	addr := ":" + port
-	log.Printf("[build-server] listening on %s (default cwd %s)", addr, defaultCwd)
 	srv := &http.Server{Addr: addr, Handler: mux}
-	log.Fatal(srv.ListenAndServe())
+
+	// Graceful shutdown on SIGTERM/SIGINT: Argo/Kubernetes SIGTERMs the sidecar
+	// once the main container finishes. Handle it explicitly so we exit 0 (as
+	// PID 1 a Go process won't act on an un-handled SIGTERM), instead of hanging
+	// until SIGKILL and being reported as an unclean exit.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		sig := <-stop
+		log.Printf("[build-server] received %s, shutting down", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("[build-server] graceful shutdown failed: %v", err)
+			_ = srv.Close()
+		}
+	}()
+
+	log.Printf("[build-server] listening on %s (default cwd %s)", addr, defaultCwd)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("[build-server] server error: %v", err)
+	}
+	log.Printf("[build-server] stopped")
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
