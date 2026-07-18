@@ -5,6 +5,14 @@ metadata:
   name: refactor-agent
 automountServiceAccountToken: false
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: refactor-agent.service-account-token
+  annotations:
+    kubernetes.io/service-account.name: refactor-agent
+type: kubernetes.io/service-account-token
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
