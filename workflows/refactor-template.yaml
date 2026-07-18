@@ -24,13 +24,13 @@ spec:
         description: "Branch the agent's changes are pushed to (on the fork)."
 
       - name: fork-org
-        value: ""
+        value: "monad-of-no-return"
         description: >-
           GitHub org to create the fork in (the token's account must be able to
           create repos there). Empty = fork into the bot user's own account.
 
       - name: pr-mode
-        value: "manual"
+        value: "skip"
         enum:
           - manual
           - auto
@@ -50,7 +50,7 @@ spec:
         description: "Carrier image (buildserver/Dockerfile) holding the static /execute binary."
 
       - name: toolchain-image
-        value: "docker.io/haskell:9.10"
+        value: "docker.io/haskell:9.14"
         description: "Stock image the build sidecar runs (cabal/ghc); swappable, no rebuild needed."
 
       - name: run-tests
