@@ -343,18 +343,8 @@ spec:
           fi
           FORK_FULL="${FORK_OWNER}/${FORK_NAME}"
 
-          # Reuse an existing fork instead of forking again -- `gh repo fork` is
-          # not reliably idempotent into an org (a name clash gets auto-suffixed,
-          # creating a stray repo). Check first: if a repo already exists at the
-          # target and IS a fork of this upstream, use it; if the name is taken by
-          # something else, bail rather than create a mis-named fork.
-          if PARENT="$(gh repo view "$FORK_FULL" --json parent --jq '.parent.nameWithOwner // "NONE"' 2>/dev/null)"; then
-            if [ "$PARENT" = "$SLUG" ]; then
-              echo "Reusing existing fork $FORK_FULL (fork of $SLUG)."
-            else
-              echo "ERROR: $FORK_FULL already exists but is not a fork of $SLUG (parent: $PARENT)." >&2
-              exit 1
-            fi
+          if gh repo view "$FORK_FULL" >/dev/null 2>&1; then
+            echo "$FORK_FULL already exists; pushing to it."
           elif [ -n "$FORK_ORG" ]; then
             gh repo fork "$SLUG" --org "$FORK_ORG" --clone=false
           else
