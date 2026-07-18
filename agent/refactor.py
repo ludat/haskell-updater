@@ -417,9 +417,14 @@ def builder_exec(builder_url: str, command: list[str], cwd: str, timeout: int) -
 
 
 def run_build(builder_url: str, cwd: str, run_tests: bool, do_update: bool,
-              timeout: int) -> dict:
-    """Drive cabal in the build-server sidecar; return a structured build report."""
+              timeout: int, jobs: int = 1) -> dict:
+    """Drive cabal in the build-server sidecar; return a structured build report.
+
+    ``jobs`` caps cabal's parallelism (``-j<jobs>``). Defaults to 1 so the build
+    stays within a single core instead of fanning out to every CPU.
+    """
     steps: list[dict] = []
+    jflag = [f"-j{jobs}"]
 
     def step(name: str, command: list[str], required: bool) -> bool:
         print(f"[build] {name}: {' '.join(command)}", flush=True)
@@ -438,10 +443,10 @@ def run_build(builder_url: str, cwd: str, run_tests: bool, do_update: bool,
         # Best-effort: a stale-but-present index is fine, so don't fail on this.
         step("cabal update", ["cabal", "update"], required=False)
 
-    ok = step("cabal build", ["cabal", "build", "all"], required=True)
+    ok = step("cabal build", ["cabal", "build", "all", *jflag], required=True)
     tests_ok = None
     if ok and run_tests:
-        tests_ok = step("cabal test", ["cabal", "test", "all"], required=True)
+        tests_ok = step("cabal test", ["cabal", "test", "all", *jflag], required=True)
 
     return {
         "ok": ok and (tests_ok is not False),
@@ -565,7 +570,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     try:
         wait_for_builder(args.builder_url, args.builder_timeout)
         build = run_build(args.builder_url, build_cwd, args.run_tests,
-                          args.cabal_update, args.timeout)
+                          args.cabal_update, args.timeout, args.jobs)
     except (urllib.error.URLError, OSError, ValueError, TimeoutError) as exc:
         result["status"] = "builder-error"
         result["error"] = f"builder exec failed: {exc}"
@@ -653,6 +658,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="don't print the selected diff before applying (on by default)")
     run.add_argument("--timeout", type=int,
                      default=int(os.environ.get("BUILD_TIMEOUT", "3600")))
+    run.add_argument("--jobs", type=int, default=int(os.environ.get("CABAL_JOBS", "1")),
+                     help="cabal parallelism (-j); default 1 to stay on one core")
     run.set_defaults(func=cmd_run)
 
     lst = sub.add_parser("list", parents=[common],
