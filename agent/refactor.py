@@ -39,6 +39,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 # --------------------------------------------------------------------------- #
@@ -311,6 +312,12 @@ def resolve_package(key: str) -> dict:
         # Only git can be forked/PR'd on GitHub; darcs/mercurial/svn can't.
         raise LookupError(
             f"{name} uses a non-git source repository ({vcs}: {repo}); skip it"
+        )
+    host = (urllib.parse.urlparse(repo).hostname or "").lower()
+    if host not in ("github.com", "www.github.com"):
+        # The fork + compare-URL flow only works against GitHub.
+        raise LookupError(
+            f"{name}'s repository is not on github.com ({repo}); skip it"
         )
     return {
         "package": key,
