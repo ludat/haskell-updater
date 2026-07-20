@@ -584,7 +584,7 @@ index f1594a4..4a01df7 100644
  apply :: (Ord b, Num b, Bits b) => IntTrie a -> b -> a
 
 
-# diff for data-msgpack-types-0.0.3
+# diff for msgpack-types-0.0.3
 diff --git a/src/Data/MessagePack/Types/Option.hs b/src/Data/MessagePack/Types/Option.hs
 index 823cfef..bf4c74c 100644
 --- a/src/Data/MessagePack/Types/Option.hs
