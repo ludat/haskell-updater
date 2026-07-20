@@ -450,10 +450,10 @@ def run_build(builder_url: str, cwd: str, run_tests: bool, do_update: bool,
         # Best-effort: a stale-but-present index is fine, so don't fail on this.
         step("cabal update", ["cabal", "update"], required=False)
 
-    ok = step("cabal build", ["cabal", "build", "all", *jflag], required=True)
+    ok = step("cabal build", ["cabal", "build", *jflag], required=True)
     tests_ok = None
     if ok and run_tests:
-        tests_ok = step("cabal test", ["cabal", "test", "all", *jflag], required=True)
+        tests_ok = step("cabal test", ["cabal", "test", *jflag], required=True)
 
     return {
         "ok": ok and (tests_ok is not False),
