@@ -516,9 +516,13 @@ spec:
         volumeMounts:
           - name: workspace
             mountPath: /workspace
-            subPath: "{{workflow.name}}"
         command: [sh]
         source: |
           set -eu
-          rm -rf /workspace/repo /workspace/result.json
-          echo "Cleared workspace subpath for {{workflow.name}}"
+          NAME='{{workflow.name}}'
+          if [ -z "$NAME" ]; then
+            echo "refusing to delete: empty workflow name" >&2
+            exit 1
+          fi
+          rm -rfv "/workspace/$NAME"
+          echo "Removed workspace dir for $NAME"
